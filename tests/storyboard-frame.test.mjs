@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -97,6 +97,32 @@ test('storyboard frame bridge blocks future frames and invalid refs', async () =
       () => normalizeStoryboardRef('chunks/chunk-0000/storyboards/../outside.jpg'),
       /allowlisted|traversal/i
     );
+  } finally {
+    await rm(fixture.packageDir, { recursive: true, force: true });
+  }
+});
+
+test('HD uses the same reference and timestamp gate before opening the source', async () => {
+  const fixture = await createPackage();
+  try {
+    const options = { storyboardRef: fixture.storyboardRef, mediaTimeMs: 5000,
+      playheadMs: 6000, quality: 'hd', inputPath: 'must-not-be-opened.mp4' };
+    await assert.rejects(readSpoilerGatedStoryboardFrame(fixture.packageDir,
+      { ...options, playheadMs: 4999 }), /current playhead/);
+    await assert.rejects(readSpoilerGatedStoryboardFrame(fixture.packageDir,
+      { ...options, mediaTimeMs: 5100 }), /not revealed/);
+    await assert.rejects(readSpoilerGatedStoryboardFrame(fixture.packageDir,
+      { ...options, storyboardRef: 'chunks/chunk-0000/storyboards/unknown.jpg' }), /not revealed/);
+    await assert.rejects(readSpoilerGatedStoryboardFrame(fixture.packageDir,
+      { ...options, quality: 'invalid' }), /quality must/);
+    const visualPath = join(fixture.packageDir, 'chunks', 'chunk-0000', 'visual.json');
+    const visual = JSON.parse(await readFile(visualPath, 'utf8'));
+    visual.observations[0].storyboard.panelTimesMs = [4500, 5000, 6500];
+    await writeFile(visualPath, JSON.stringify(visual));
+    for (const quality of ['storyboard', 'hd']) {
+      await assert.rejects(readSpoilerGatedStoryboardFrame(fixture.packageDir,
+        { ...options, quality }), /panels have not reached/);
+    }
   } finally {
     await rm(fixture.packageDir, { recursive: true, force: true });
   }

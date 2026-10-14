@@ -20,6 +20,7 @@ function sessionProjection() {
       s.last_position_ms as lastPositionMs,
       s.playback_state as playbackState,
       s.playback_version as playbackVersion,
+      s.seek_version as seekVersion,
       s.updated_at as updatedAt,
       count(m.id) as messageCount
     from watch_sessions s
@@ -110,6 +111,7 @@ export function openDatabase(databasePath) {
     );
   `);
 
+  ensureColumn(db, 'watch_sessions', 'seek_version', 'integer not null default 0');
   ensureColumn(db, 'media', 'compatibility_status', "text not null default 'unchecked'");
   ensureColumn(db, 'media', 'container_name', 'text');
   ensureColumn(db, 'media', 'video_codec', 'text');
@@ -287,7 +289,8 @@ export function endSession(db, sessionId, { lastPositionMs = 0 } = {}) {
 
 export function updateSessionPlayback(db, sessionId, {
   mediaTimeMs,
-  playbackState
+  playbackState,
+  seeked = false
 }) {
   const session = getSession(db, sessionId);
   if (!session) throw new Error('Room not found.');
@@ -300,9 +303,10 @@ export function updateSessionPlayback(db, sessionId, {
     set last_position_ms = ?,
         playback_state = ?,
         playback_version = playback_version + 1,
+        seek_version = seek_version + ?,
         updated_at = ?
     where id = ? and status = 'active'
-  `).run(Math.max(0, Math.round(mediaTimeMs)), normalizedState, now, sessionId);
+  `).run(Math.max(0, Math.round(mediaTimeMs)), normalizedState, seeked ? 1 : 0, now, sessionId);
   return getSession(db, sessionId);
 }
 

@@ -385,6 +385,7 @@ export async function runObservationPrecompute(projectRoot, {
           sampleFps: manifest.sampleFps,
           outputDir: storyboardDir,
           storyboardPrefix: chunk.chunkId,
+          visualStartMs: chunk.acceptFromMs,
           timeoutMs
         });
         const accepted = trimAnalysisToOwnership(analysis, chunk);

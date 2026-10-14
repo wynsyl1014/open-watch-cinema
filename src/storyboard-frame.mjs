@@ -1,5 +1,7 @@
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 import { readObservationTrackWindow } from './observation-track-reader.mjs';
 
@@ -10,6 +12,7 @@ const MIME_TYPES = new Map([
   ['.webp', 'image/webp']
 ]);
 const MAX_FRAME_BYTES = 8 * 1024 * 1024;
+const runFile = promisify(execFile);
 
 function requireNonNegativeInteger(value, label) {
   if (!Number.isSafeInteger(value) || value < 0) {
@@ -36,8 +39,13 @@ export function normalizeStoryboardRef(value) {
 export async function readSpoilerGatedStoryboardFrame(packageDir, {
   storyboardRef,
   mediaTimeMs,
-  playheadMs
+  playheadMs,
+  quality = 'storyboard',
+  inputPath
 }) {
+  if (!['storyboard', 'hd'].includes(quality)) {
+    throw new TypeError('quality must be storyboard or hd.');
+  }
   mediaTimeMs = requireNonNegativeInteger(mediaTimeMs, 'mediaTimeMs');
   playheadMs = requireNonNegativeInteger(playheadMs, 'playheadMs');
   if (mediaTimeMs > playheadMs) {
@@ -63,6 +71,35 @@ export async function readSpoilerGatedStoryboardFrame(packageDir, {
   if (!observation) {
     throw new Error('The requested storyboard is not revealed for this room playhead.');
   }
+  const panelTimesMs = observation.storyboard.panelTimesMs;
+  if (panelTimesMs && (!Array.isArray(panelTimesMs) || panelTimesMs.length !== 3
+      || panelTimesMs.some((time) => !Number.isSafeInteger(time) || time < 0 || time > playheadMs))) {
+    throw new Error('The storyboard panels have not reached the current playhead yet.');
+  }
+
+  if (quality === 'hd') {
+    if (!inputPath) throw new Error('The room source video is unavailable.');
+    const { stdout: content } = await runFile('ffmpeg', [
+      '-hide_banner', '-loglevel', 'error',
+      '-ss', (mediaTimeMs / 1000).toFixed(3), '-i', inputPath,
+      '-an', '-frames:v', '1', '-vf',
+      "scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:flags=lanczos",
+      '-f', 'image2pipe', '-vcodec', 'mjpeg', '-q:v', '2', 'pipe:1'
+    ], { encoding: 'buffer', maxBuffer: MAX_FRAME_BYTES, timeout: 12_000, windowsHide: true });
+    if (!content.length) throw new Error('No source frame exists at this timestamp.');
+    return {
+      content,
+      mimeType: 'image/jpeg',
+      metadata: {
+        storyboardRef: ref, mediaTimeMs, playheadMs, quality,
+        revealThroughMs: window.revealThroughMs,
+        fromMs: observation.fromMs, toMs: observation.toMs,
+        kind: observation.kind,
+        frameReason: observation.storyboard.frameReason || observation.kind,
+        bytes: content.byteLength
+      }
+    };
+  }
 
   const candidatePath = resolve(packageRoot, ref);
   const framePath = await realpath(candidatePath);
@@ -83,6 +120,8 @@ export async function readSpoilerGatedStoryboardFrame(packageDir, {
     mimeType,
     metadata: {
       storyboardRef: ref,
+      quality,
+      ...(panelTimesMs ? { panelTimesMs } : {}),
       mediaTimeMs,
       playheadMs,
       revealThroughMs: window.revealThroughMs,

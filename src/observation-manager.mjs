@@ -98,6 +98,7 @@ export async function analyzeObservationSegment(projectRoot, {
   sampleFps = 2,
   outputDir = null,
   storyboardPrefix = 'segment',
+  visualStartMs = startMs,
   timeoutMs = 120_000
 }) {
   const python = await resolveObserverPython(projectRoot);
@@ -111,5 +112,6 @@ export async function analyzeObservationSegment(projectRoot, {
   ];
   if (outputDir) args.push('--output-dir', outputDir);
   if (storyboardPrefix) args.push('--storyboard-prefix', String(storyboardPrefix).slice(0, 80));
+  args.push('--visual-start-ms', String(Math.max(0, Math.round(visualStartMs))));
   return runProcess(python, args, { cwd: projectRoot, timeoutMs });
 }

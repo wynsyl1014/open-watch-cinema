@@ -210,6 +210,8 @@ def opencv_metrics(frame: PpmFrame, previous: dict | None, cv2, np) -> tuple[dic
     scene_score = min(1.0, histogram_distance * 0.62 + difference * 1.35 + edge_change * 0.85)
     motion_score = min(1.0, motion_mean / 5.5 + motion_coverage * 0.4)
     metrics = {
+        "sharpness": round(float(cv2.Laplacian(gray, cv2.CV_64F).var()), 4),
+        "clippedFraction": round(float(np.mean((gray < 12) | (gray > 243))), 4),
         "brightness": round(brightness, 4),
         "saturation": round(saturation, 4),
         "averageRgb": [round(red, 4), round(green, 4), round(blue, 4)],
@@ -229,17 +231,73 @@ def opencv_metrics(frame: PpmFrame, previous: dict | None, cv2, np) -> tuple[dic
     return metrics, {"gray": gray, "histogram": histogram, "edgeDensity": edge_density}
 
 
+def select_storyboard_indices(metrics_list: list[dict], index: int, step_ms: float, reason: str) -> list[int]:
+    """Rank nearby samples, preferring a settled post-cut frame and distinct context."""
+    end = min(len(metrics_list) - 1, index + int(800 / step_ms))
+    candidates = list(range(index, end + 1))
+    if reason == "scene_change":
+        settled = [i for i in candidates if 300 <= (i - index) * step_ms <= 800
+                   and metrics_list[i]["sceneScore"] < 0.34]
+        if settled:
+            candidates = settled
+
+    def score(i):
+        m = metrics_list[i]
+        return (math.log1p(m.get("sharpness", 0)) / 8
+                - m.get("clippedFraction", 0) * 1.5
+                - abs(m["brightness"] - 0.5) * 0.5
+                - min(m["motionMeanPixels"] / 5.5, 1) * 0.8
+                - m["sceneScore"] * 0.8)
+
+    selected = max(candidates, key=score)
+    # The inspection frame is the final panel: no panel can reveal its future.
+    context = list(range(max(0, index - max(2, int(1500 / step_ms))), selected))
+    chosen = [selected]
+    for i in sorted(context, key=score, reverse=True):
+        if all(not hashes_similar(metrics_list[i], metrics_list[j]) for j in chosen):
+            chosen.append(i)
+        if len(chosen) == 3:
+            break
+    # Static shots may not contain three distinct images; retain the strip layout.
+    for i in sorted(context, reverse=True) + [selected] * 3:
+        if len(chosen) == 3:
+            break
+        if i not in chosen or i == selected:
+            chosen.append(i)
+    return sorted(chosen)
+
+
+def hashes_similar(left: dict, right: dict) -> bool:
+    a, b = left.get("perceptualHash"), right.get("perceptualHash")
+    # pHash alone treats differently coloured flat frames as identical.
+    return bool(a and b and (int(a, 16) ^ int(b, 16)).bit_count() <= 4
+                and max(abs(x - y) for x, y in zip(left["averageRgb"], right["averageRgb"])) < 0.08)
+
+
 def write_storyboard(
-    frames: list[PpmFrame],
-    index: int,
+    input_path: Path,
+    panel_times_ms: list[int],
     output_dir: Path,
     filename: str,
     cv2,
     np,
 ) -> None:
     panels = []
-    for frame_index in (max(0, index - 1), index, min(len(frames) - 1, index + 1)):
-        frame = frames[frame_index]
+    for timestamp in panel_times_ms:
+        result = subprocess.run([
+            "ffmpeg", "-hide_banner", "-loglevel", "error",
+            "-ss", f"{timestamp / 1000:.3f}", "-i", os.fspath(input_path),
+            "-an", "-frames:v", "1", "-vf",
+            "scale=512:288:force_original_aspect_ratio=decrease:flags=lanczos,"
+            "pad=512:288:(ow-iw)/2:(oh-ih)/2:black",
+            "-f", "image2pipe", "-vcodec", "ppm", "pipe:1",
+        ], capture_output=True, check=False, timeout=30)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.decode("utf-8", errors="replace"))
+        extracted = list(parse_ppm_stream(result.stdout))
+        if not extracted:
+            raise RuntimeError(f"No source frame at {timestamp} ms.")
+        frame = extracted[0]
         rgb = np.frombuffer(frame.pixels, dtype=np.uint8).reshape((frame.height, frame.width, 3))
         panels.append(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
     gutter = np.full((panels[0].shape[0], 4, 3), 12, dtype=np.uint8)
@@ -256,6 +314,7 @@ def analyse_segment(
     sample_fps: float,
     output_dir: Path | None,
     storyboard_prefix: str,
+    visual_start_ms: int | None = None,
 ) -> dict:
     if not input_path.is_file():
         raise FileNotFoundError(f"Video not found: {input_path}")
@@ -282,10 +341,15 @@ def analyse_segment(
     storyboards = []
     last_event_ms = start_ms - 8_000
     last_storyboard_ms = start_ms - 3_000
+    visual_start_ms = max(start_ms, int(visual_start_ms if visual_start_ms is not None else start_ms))
+    last_visual_ms = None
     previous_motion = 0.0
 
     for index, metrics in enumerate(metrics_list):
         media_time_ms = start_ms + round(index * step_ms)
+        visual_due = (enhanced and output_dir is not None
+                      and media_time_ms >= visual_start_ms
+                      and (last_visual_ms is None or media_time_ms - last_visual_ms >= 12_000))
         reason = None
         if index == 0:
             reason = "segment_start"
@@ -300,6 +364,9 @@ def analyse_segment(
         elif media_time_ms - last_event_ms >= 8_000:
             reason = "heartbeat"
         previous_motion = metrics["motionScore"]
+        detected_event = reason is not None
+        if visual_due and reason not in {"scene_change", "motion_peak"}:
+            reason = "visual_heartbeat"
         if reason is None:
             continue
 
@@ -314,23 +381,38 @@ def analyse_segment(
         if (
             enhanced
             and output_dir is not None
-            and reason in {"scene_change", "motion_peak"}
-            and media_time_ms - last_storyboard_ms >= 2_500
+            and (visual_due or (reason in {"scene_change", "motion_peak"}
+                                and media_time_ms - last_storyboard_ms >= 2_500))
         ):
             filename = f"{storyboard_prefix}-{len(storyboards) + 1:04d}-{media_time_ms}.jpg"
-            write_storyboard(frames, index, output_dir, filename, cv2, np)
+            indices = select_storyboard_indices(metrics_list, index, step_ms, reason)
+            panel_times_ms = [start_ms + round(i * step_ms) for i in indices]
+            selected_metrics = metrics_list[indices[-1]]
+            write_storyboard(input_path, panel_times_ms, output_dir, filename, cv2, np)
             frame_info = {
                 "filename": filename,
-                "mediaTimeMs": media_time_ms,
+                "mediaTimeMs": panel_times_ms[-1],
+                "panelTimesMs": panel_times_ms,
                 "frameReason": reason,
-                "perceptualHash": metrics.get("perceptualHash"),
+                "perceptualHash": selected_metrics.get("perceptualHash"),
+                "averageRgb": selected_metrics.get("averageRgb"),
             }
+            # Deliver the event only when every panel has been seen. Keep the
+            # original detector timestamp for clients inspecting event timing.
+            observation["eventTimeMs"] = media_time_ms
+            observation["fromMs"] = panel_times_ms[-1]
+            observation["toMs"] = min(start_ms + duration_ms, panel_times_ms[-1] + round(step_ms))
             observation["storyboard"] = frame_info
             storyboards.append(frame_info)
-            last_storyboard_ms = media_time_ms
+            # A fallback must not suppress a real event that arrives just after it.
+            if reason in {"scene_change", "motion_peak"}:
+                last_storyboard_ms = media_time_ms
+            if panel_times_ms[-1] >= visual_start_ms:
+                last_visual_ms = panel_times_ms[-1]
 
         observations.append(observation)
-        last_event_ms = media_time_ms
+        if detected_event:
+            last_event_ms = media_time_ms
 
     return {
         "ok": True,
@@ -356,6 +438,7 @@ def build_parser() -> argparse.ArgumentParser:
     analyse.add_argument("--sample-fps", type=float, default=2.0)
     analyse.add_argument("--output-dir")
     analyse.add_argument("--storyboard-prefix", default="segment")
+    analyse.add_argument("--visual-start-ms", type=int)
     return parser
 
 
@@ -369,6 +452,7 @@ def main() -> int:
             args.sample_fps,
             Path(args.output_dir) if args.output_dir else None,
             args.storyboard_prefix,
+            args.visual_start_ms,
         )
         print(json.dumps(payload, ensure_ascii=False))
         return 0

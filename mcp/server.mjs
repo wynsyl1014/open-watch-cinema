@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { buildViewingFeed } from './viewing-feed.mjs';
 
 const MCP_ROOT = dirname(fileURLToPath(import.meta.url));
 const WATCH_SKILL_URI = 'open-watch-cinema://skills/watch-together';
@@ -12,7 +13,7 @@ const WATCH_SKILL_RESOURCE = {
   description: 'Operational identity, cursor, polling, frame-inspection, multi-AI, and discrete-context rules for watching through this MCP.',
   mimeType: 'text/markdown'
 };
-const SERVER_INFO = { name: 'open-watch-cinema', version: '0.5.0' };
+const SERVER_INFO = { name: 'open-watch-cinema', version: '0.6.0' };
 const DEFAULT_URLS = [
   process.env.OPEN_WATCH_CINEMA_URL,
   'http://127.0.0.1:4182',
@@ -129,10 +130,11 @@ function decodeFrameMetadata(value) {
   }
 }
 
-async function cinemaFrameResult(roomId, storyboardRef, mediaTimeMs) {
+async function cinemaFrameResult(roomId, storyboardRef, mediaTimeMs, quality = 'storyboard') {
   const baseUrl = await discoverCinema();
   const query = new URLSearchParams({
     storyboardRef,
+    quality,
     mediaTimeMs: String(mediaTimeMs)
   });
   const response = await fetch(new URL(
@@ -237,7 +239,7 @@ const TOOLS = [
   },
   {
     name: 'open_watch_cinema_tick',
-    description: 'Poll one compact, spoiler-gated viewing increment containing playback state, new room messages, dialogue, selected storyboards, and compact motion events. Preserve and pass back the returned cursors on the next call. Set consumerName to the same AI name used when posting so self-authored messages are skipped without stalling the cursor. Use cinema_read_window only when a fuller inspection is needed.',
+    description: 'Poll one compact, spoiler-gated viewing increment containing playback state, new room messages, dialogue, selected storyboards, motion events. Inspect the up to two attached storyboard images alongside dialogue; do not invent unseen scene facts. Preserve and pass back every returned cursor field, including seekVersion. If the connector rejects seekVersion, refresh its cached tools rather than dropping the field. Set consumerName to the same AI name used when posting so self-authored messages are skipped without stalling the cursor. Use cinema_read_window only when a fuller inspection is needed.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -252,6 +254,7 @@ const TOOLS = [
           type: 'object',
           properties: {
             mediaMs: { type: 'integer', minimum: 0 },
+            seekVersion: { type: 'integer', minimum: 0, description: 'Required whenever mediaMs is provided. Return the value from the previous tick unchanged.' },
             messageId: { type: 'integer', minimum: 0, default: 0 },
             observationSequence: { type: 'integer', minimum: 0, default: 0 }
           },
@@ -276,7 +279,7 @@ const TOOLS = [
   },
   {
     name: 'cinema_read_window',
-    description: 'Read spoiler-gated visual observations and timed dialogue for a room around the current playhead.',
+    description: 'Read spoiler-gated visual observations and timed dialogue around the current playhead.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -294,12 +297,13 @@ const TOOLS = [
   },
   {
     name: 'cinema_get_frame',
-    description: 'Fetch one spoiler-gated storyboard image selected by open_watch_cinema_tick. Use only a storyboardRef and mediaTimeMs returned by a consumed tick.',
+    description: 'Fetch a spoiler-gated storyboard selected by open_watch_cinema_tick, or use quality hd to inspect its final frame from the source video at up to 1920x1080. Use only a storyboardRef and mediaTimeMs returned by a consumed tick.',
     inputSchema: {
       type: 'object',
       properties: {
         roomId: { type: 'string', format: 'uuid' },
         storyboardRef: { type: 'string', minLength: 1, maxLength: 500 },
+        quality: { type: 'string', enum: ['storyboard', 'hd'], default: 'storyboard' },
         mediaTimeMs: { type: 'integer', minimum: 0 }
       },
       required: ['roomId', 'storyboardRef', 'mediaTimeMs'],
@@ -388,7 +392,13 @@ async function callTool(name, rawArguments) {
       const limits = args.limits === undefined ? {} : requireObject(args.limits, 'limits');
       const normalizedCursors = {};
       if (Object.hasOwn(cursors, 'mediaMs')) {
+        if (!Object.hasOwn(cursors, 'seekVersion')) {
+          throw new Error('Cursor schema is out of date: mediaMs requires seekVersion. Refresh the Open Watch Cinema connector tools, then retry with the complete last returned cursors. Do not drop seekVersion or reset cursors to work around this error.');
+        }
         normalizedCursors.mediaMs = requireInteger(cursors.mediaMs, 'cursors.mediaMs');
+      }
+      if (Object.hasOwn(cursors, 'seekVersion')) {
+        normalizedCursors.seekVersion = requireInteger(cursors.seekVersion, 'cursors.seekVersion');
       }
       if (Object.hasOwn(cursors, 'messageId')) {
         normalizedCursors.messageId = requireInteger(cursors.messageId, 'cursors.messageId');
@@ -413,13 +423,17 @@ async function callTool(name, rawArguments) {
           normalizedLimits[key] = requireInteger(limits[key], `limits.${key}`, rule);
         }
       }
-      return cinemaRequest(`/api/rooms/${encodeURIComponent(roomId)}/ai-tick`, {
+      const payload = await cinemaRequest(`/api/rooms/${encodeURIComponent(roomId)}/ai-tick`, {
         method: 'POST',
         body: JSON.stringify({
           consumerName,
           cursors: normalizedCursors,
           limits: normalizedLimits
         })
+      });
+      return buildViewingFeed(payload, {
+        fetchFrame: (frame) => cinemaFrameResult(roomId, frame.storyboardRef, frame.mediaTimeMs),
+        readRoom: async () => (await cinemaRequest(`/api/rooms/${encodeURIComponent(roomId)}`)).room
       });
     }
     case 'cinema_read_window': {
@@ -438,7 +452,9 @@ async function callTool(name, rawArguments) {
       const roomId = requireString(args.roomId, 'roomId', { max: 80 });
       const storyboardRef = requireString(args.storyboardRef, 'storyboardRef', { max: 500 });
       const mediaTimeMs = requireInteger(args.mediaTimeMs, 'mediaTimeMs');
-      return cinemaFrameResult(roomId, storyboardRef, mediaTimeMs);
+      const quality = args.quality ?? 'storyboard';
+      if (!['storyboard', 'hd'].includes(quality)) throw new Error('quality must be storyboard or hd.');
+      return cinemaFrameResult(roomId, storyboardRef, mediaTimeMs, quality);
     }
     case 'cinema_post_message': {
       const roomId = requireString(args.roomId, 'roomId', { max: 80 });
@@ -476,7 +492,7 @@ async function handleRequest(message) {
           resources: { subscribe: false, listChanged: false }
         },
         serverInfo: SERVER_INFO,
-        instructions: `Read the AI viewing skill at ${WATCH_SKILL_URI}. Choose one stable display name for yourself in this cinema, or use the name the viewer gives you. Pass that exact name as consumerName on every open_watch_cinema_tick call and as senderName on every cinema_post_message call. Preserve returned cursors separately for this room and AI identity, then pass them back unchanged. Use cinema_get_frame only for storyboard entries returned by a consumed tick. Reply through cinema_post_message. Use cinema_read_window only for a bounded fuller inspection. Never infer dialogue, frames, or future plot beyond spoiler-gated responses.`
+        instructions: `Read the AI viewing skill at ${WATCH_SKILL_URI}. Choose one stable display name for yourself in this cinema, or use the name the viewer gives you. Pass that exact name as consumerName on every open_watch_cinema_tick call and as senderName on every cinema_post_message call. Preserve returned cursors separately for this room and AI identity, then pass them back unchanged including seekVersion. If that field is rejected, refresh the connector schema; never strip it. Inspect the storyboard images attached to ticks alongside dialogue. Use cinema_get_frame only for storyboard entries returned by a consumed tick. Reply through cinema_post_message. Keep the viewing turn polling until the viewer presses Stop in the chat, explicitly asks to leave, the room ends, or polling becomes impossible. Pauses, empty ticks, replies, and completed checks do not end the loop. Respect host cancellation and execution limits; do not claim background polling or end the shared room when the chat stops. Use cinema_read_window only for a bounded fuller inspection. Never infer dialogue, frames, or future plot beyond spoiler-gated responses.`
       }
     };
   }

@@ -69,7 +69,8 @@ test('cinema tick combines exact messages with compact spoiler-gated viewing mat
           storyboard: {
             mediaTimeMs: 11_500,
             frameReason: 'scene_change',
-            perceptualHash: 'same-hash',
+            perceptualHash: 'f0f0f0f0f0f0f0f0',
+            averageRgb: [0.4, 0.4, 0.4],
             storyboardRef: 'chunks/a/storyboards/one.jpg'
           }
         },
@@ -83,7 +84,8 @@ test('cinema tick combines exact messages with compact spoiler-gated viewing mat
           storyboard: {
             mediaTimeMs: 12_000,
             frameReason: 'motion_peak',
-            perceptualHash: 'same-hash',
+            perceptualHash: 'f0f0f0f0f0f0f0f1',
+            averageRgb: [0.4, 0.4, 0.4],
             storyboardRef: 'chunks/a/storyboards/duplicate.jpg'
           }
         }
@@ -95,7 +97,7 @@ test('cinema tick combines exact messages with compact spoiler-gated viewing mat
   assert.equal(tick.newMessages[0].content, 'Did you notice the stone?');
   assert.equal(tick.dialogueDelta[0].text, 'Look over there.');
   assert.equal(tick.storyboards.length, 1);
-  assert.equal(tick.storyboards[0].storyboardRef, 'chunks/a/storyboards/one.jpg');
+  assert.equal(tick.storyboards[0].storyboardRef, 'chunks/a/storyboards/duplicate.jpg');
   assert.equal(tick.motionEvents.length, 3);
   assert.equal(tick.cursors.mediaMs, 20_000);
   assert.equal(tick.cursors.messageId, 5);
@@ -104,6 +106,25 @@ test('cinema tick combines exact messages with compact spoiler-gated viewing mat
   assert.equal(JSON.stringify(tick).includes('brightness'), false);
   assert.equal(JSON.stringify(tick).includes('histogramDistance'), false);
   assert.equal(JSON.stringify(tick).includes('perceptualHash'), false);
+});
+
+test('storyboard limit retains the newest view even when earlier action scores higher', () => {
+  const input = {
+    room: fixtureRoom(),
+    targetRange: { fromMs: 0, toMs: 20_000, playheadMs: 20_000 },
+    window: {
+      observations: [1_000, 5_000, 19_000].map((mediaTimeMs, index) => ({
+        fromMs: mediaTimeMs,
+        kind: index < 2 ? 'scene_change' : 'visual_event',
+        sceneScore: index < 2 ? 0.9 : 0,
+        storyboard: { mediaTimeMs, storyboardRef: `frame-${mediaTimeMs}.jpg` }
+      }))
+    }
+  };
+  const tick = buildCinemaTick({ ...input, limits: { maxStoryboards: 2 } });
+  assert.deepEqual(tick.storyboards.map((frame) => frame.mediaTimeMs), [1_000, 19_000]);
+  const single = buildCinemaTick({ ...input, limits: { maxStoryboards: 1 } });
+  assert.deepEqual(single.storyboards.map((frame) => frame.mediaTimeMs), [19_000]);
 });
 
 test('cinema tick reports backlog without dropping independent message and observation cursors', () => {
@@ -132,6 +153,7 @@ test('cinema tick reports backlog without dropping independent message and obser
 
   assert.deepEqual(tick.cursors, {
     mediaMs: 15_000,
+    seekVersion: 0,
     messageId: 10,
     observationSequence: 20
   });
