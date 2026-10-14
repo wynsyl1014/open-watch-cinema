@@ -10,6 +10,7 @@ function parseArguments(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     const value = argv[index + 1];
+    if (argument === '--audio') { options.includeAudio = true; continue; }
     if (argument === '--input') options.inputPath = value;
     else if (argument === '--output-root') options.outputRoot = value;
     else if (argument === '--max-chunks') options.maxChunks = Number(value);

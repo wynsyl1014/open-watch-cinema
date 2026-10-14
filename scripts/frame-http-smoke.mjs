@@ -163,10 +163,11 @@ try {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
   }
   assert.equal(result.payload.job.status, 'done');
+  const preparedMediaId = result.payload.job.replacementMediaId;
 
   result = await requestJson('/api/media');
   assert.equal(result.response.status, 200);
-  const preparedMedia = result.payload.items.find((item) => item.compatibilityStatus === 'ready');
+  const preparedMedia = result.payload.items.find((item) => item.id === preparedMediaId);
   assert.ok(preparedMedia, 'Expected one prepared media item.');
   const mediaId = preparedMedia.id;
 
@@ -211,6 +212,23 @@ try {
   assert.equal(metadata.mediaTimeMs, 500);
   assert.equal(metadata.storyboardRef, fixture.storyboardRef);
 
+  frameUrl.searchParams.set('quality', 'hd');
+  const hdResponse = await fetch(frameUrl);
+  assert.equal(hdResponse.status, 200);
+  const hdBytes = Buffer.from(await hdResponse.arrayBuffer());
+  assert.ok(hdBytes.length > fixture.frameBytes.length);
+  const hdPath = join(localDataRoot, 'hd.jpg');
+  await writeFile(hdPath, hdBytes);
+  const hdDimensions = await run('ffprobe', [
+    '-v', 'error', '-show_entries', 'stream=width,height', '-of', 'json', hdPath
+  ]);
+  assert.deepEqual(JSON.parse(hdDimensions.stdout).streams[0], { width: 320, height: 180 });
+  const hdMetadata = JSON.parse(Buffer.from(
+    hdResponse.headers.get('x-open-watch-frame-metadata'), 'base64url'
+  ).toString('utf8'));
+  assert.equal(hdMetadata.quality, 'hd');
+  assert.equal(hdMetadata.mediaTimeMs, 500);
+
   result = await requestJson(`/api/rooms/${roomId}/playback`, {
     method: 'POST',
     body: JSON.stringify({ mediaTimeMs: 400, playbackState: 'paused' })
@@ -220,6 +238,8 @@ try {
   assert.equal(blockedResponse.status, 409);
   const blocked = await blockedResponse.json();
   assert.match(blocked.error, /current playhead/i);
+  frameUrl.searchParams.delete('quality');
+  assert.equal((await fetch(frameUrl)).status, 409);
 
   console.log('frame-http-smoke: PASS');
 } finally {

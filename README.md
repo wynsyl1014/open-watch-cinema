@@ -6,6 +6,8 @@ The primary launch targets are Windows and macOS. The application binds only to 
 
 Human users should begin with [`FOR_USERS.md`](./FOR_USERS.md). MCP hosts and connected models should also read [`mcp/README.md`](./mcp/README.md) and [`mcp/SKILL.md`](./mcp/SKILL.md).
 
+Optional [local audio descriptions](./docs/audio-descriptions.md) add possible speech, music, ambience, and sound-effect descriptions to the same prepared chunks and AI updates. Run `setup-audio.ps1` on Windows or `bash setup-audio.command` on macOS, then choose **Add audio descriptions** for an existing AI package. Audio inference runs locally; a historical Windows CPU validation prepared all 26 chunks of one test film and exercised companion playback. The scope and remaining limits are documented with the audio feature.
+
 ## Requirements
 
 - Node.js 24 or newer.
@@ -192,6 +194,10 @@ During ordinary viewing, a model repeatedly calls `open_watch_cinema_tick`, supp
 Matching self-authored messages are omitted while the cursor still advances. Raw brightness, RGB, histogram, and other low-level telemetry remains server-side.
 
 When a selected storyboard matters, the model calls `cinema_get_frame` with the `storyboardRef` and `mediaTimeMs` delivered by a consumed tick. The tool returns actual MCP image content through the room-bound spoiler gate. `cinema_read_window` remains available for the smallest useful bounded structured inspection.
+
+Completed browser seeks rebase the AI media cursor to destination context while retaining independent message and observation cursors. After upgrading, restart the server and MCP adapter, reload the player, and refresh cached tool metadata if needed. See [seek synchronization](./docs/seek-sync.md).
+
+Ticks now attach up to two selected storyboard images directly as MCP image content, including sparse prepared snapshots during quiet scenes. New preparation also produces clearer storyboard strips and supports bounded HD inspection. See [visual viewing evidence](./docs/visual-evidence.md) for host support, regeneration, and validation.
 
 ### Stable names and multiple AIs
 

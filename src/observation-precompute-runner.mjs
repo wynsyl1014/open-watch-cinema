@@ -19,6 +19,9 @@ import {
 import { probeMedia } from './media-compatibility.mjs';
 import { analyzeObservationSegment } from './observation-manager.mjs';
 import {
+  audioTrackState, createAudioDescriber, getAudioDescriptionStatus, validateAudioPayload
+} from './audio-descriptions.mjs';
+import {
   createObservationPrecomputeManifest,
   getNextObservationChunk,
   markObservationChunkComplete,
@@ -116,6 +119,10 @@ async function readManifest(filePath) {
   return manifest;
 }
 
+async function readManifestAudio(packageDir, audioRef) {
+  return JSON.parse(await readFile(join(packageDir, audioRef), 'utf8'));
+}
+
 function deriveAiReadiness(manifest, dialogueTrack) {
   const blockers = [];
   if (manifest.status !== 'ready') blockers.push('visual_track_not_ready');
@@ -170,6 +177,7 @@ function withCheckpointMetadata(manifest, previous = manifest) {
       chunks: 'chunks/<chunkId>/',
       visual: 'chunks/<chunkId>/visual.json',
       dialogue: 'chunks/<chunkId>/dialogue.json',
+      audio: 'chunks/<chunkId>/audio.json',
       storyboards: 'chunks/<chunkId>/storyboards/'
     },
     visualTrack: {
@@ -260,12 +268,6 @@ export async function prepareObservationPackage(projectRoot, {
     mediaIdentity = `sha256:${await hashFile(absoluteInputPath)}`;
   }
 
-  if (dialogueSource === null) {
-    dialogueSource = await prepareDialogueSource(absoluteInputPath, {
-      preferredTrackId: preferredDialogueTrackId
-    });
-  }
-
   const manifestOptions = {
     mediaIdentity,
     durationMs,
@@ -291,7 +293,14 @@ export async function prepareObservationPackage(projectRoot, {
     }
   }
 
-  const currentDialogueTrack = dialogueTrackState(dialogueSource, manifest?.status || 'pending');
+  if (dialogueSource === null && manifest?.status !== 'ready') {
+    dialogueSource = await prepareDialogueSource(absoluteInputPath, {
+      preferredTrackId: preferredDialogueTrackId
+    });
+  }
+  const currentDialogueTrack = manifest?.status === 'ready'
+    ? manifest.dialogueTrack
+    : dialogueTrackState(dialogueSource, manifest?.status || 'pending');
   if (manifest) {
     manifest = withCheckpointMetadata({
       ...manifest,
@@ -338,7 +347,10 @@ export async function runObservationPrecompute(projectRoot, {
   maxChunks = Infinity,
   timeoutMs = 300_000,
   analyzeSegment = analyzeObservationSegment,
-  onChunkComplete = null
+  onChunkComplete = null,
+  includeAudio = false,
+  describeAudioChunk = null,
+  onAudioProgress = null
 }) {
   maxChunks = normalizeMaxChunks(maxChunks);
   const prepared = await prepareObservationPackage(projectRoot, {
@@ -358,6 +370,7 @@ export async function runObservationPrecompute(projectRoot, {
   });
 
   const releasePackageLock = await acquireObservationPackageLock(prepared.packageDir);
+  let audioDescriber = null;
   try {
     let { manifest } = prepared;
     let chunksRun = 0;
@@ -385,6 +398,7 @@ export async function runObservationPrecompute(projectRoot, {
           sampleFps: manifest.sampleFps,
           outputDir: storyboardDir,
           storyboardPrefix: chunk.chunkId,
+          visualStartMs: chunk.acceptFromMs,
           timeoutMs
         });
         const accepted = trimAnalysisToOwnership(analysis, chunk);
@@ -449,6 +463,64 @@ export async function runObservationPrecompute(projectRoot, {
       }
     }
 
+    // Audio is an additive pass: completed visual chunks are never rerun just to add sound.
+    if (includeAudio) {
+      const dataRoot = resolve(process.env.LOCAL_DATA_ROOT || join(projectRoot, 'local-data'));
+      const status = describeAudioChunk
+        ? { status: 'available', model: 'custom-local-analyzer' }
+        : await getAudioDescriptionStatus(projectRoot, dataRoot);
+      if (status.status !== 'available') {
+        if (!['ready', 'source_missing'].includes(manifest.audioTrack?.status)) {
+          manifest.audioTrack = { status: 'unavailable', note: status.note || 'Run the optional local audio setup.' };
+          manifest = await saveManifest(prepared.manifestPath, manifest);
+        }
+      } else {
+        const metadata = {
+          model: status.model, revision: status.revision, promptVersion: status.promptVersion,
+          segmentMs: status.segmentMs, device: status.device,
+        };
+        const audioProfile = JSON.stringify(metadata);
+        const reportAudio = ({ throughMs }) => onAudioProgress?.({ throughMs, durationMs: manifest.durationMs });
+        audioDescriber = describeAudioChunk ? null : createAudioDescriber(projectRoot, { dataRoot, onProgress: reportAudio });
+        const describe = describeAudioChunk || ((options) => audioDescriber.describeChunk(options));
+        for (const chunk of manifest.chunks) {
+          if (chunk.status !== 'complete') continue;
+          if (chunk.audioProfile === audioProfile && ['ready', 'source_missing'].includes(chunk.audioStatus)
+              && chunk.audioRef && await pathExists(join(prepared.packageDir, chunk.audioRef))) {
+            try {
+              validateAudioPayload(await readManifestAudio(prepared.packageDir, chunk.audioRef), chunk);
+              continue;
+            } catch { /* Regenerate an incomplete or corrupt audio checkpoint. */ }
+          }
+          chunk.audioStatus = 'running';
+          chunk.audioError = null;
+          manifest.audioTrack = { ...audioTrackState(manifest.chunks, metadata), status: 'running' };
+          manifest = await saveManifest(prepared.manifestPath, manifest);
+          reportAudio({ throughMs: chunk.logicalStartMs });
+          try {
+            const payload = validateAudioPayload(await describe({ inputPath: prepared.inputPath, chunk }), chunk);
+            const audioPath = join(prepared.packageDir, 'chunks', chunk.chunkId, 'audio.json');
+            await writeJsonCheckpoint(audioPath, { ...payload, chunkId: chunk.chunkId, planId: manifest.planId });
+            Object.assign(chunk, {
+              audioStatus: payload.status,
+              audioRef: toPortableRelativePath(prepared.packageDir, audioPath),
+              audioDescriptionCount: payload.descriptions.length,
+              audioProfile,
+            });
+          } catch (error) {
+            chunk.audioStatus = 'failed';
+            chunk.audioError = error.message;
+            manifest.audioTrack = audioTrackState(manifest.chunks, { ...metadata, note: error.message });
+            await saveManifest(prepared.manifestPath, manifest);
+            throw error;
+          }
+          manifest.audioTrack = audioTrackState(manifest.chunks, metadata);
+          manifest = await saveManifest(prepared.manifestPath, manifest);
+          reportAudio({ throughMs: chunk.logicalEndMs });
+        }
+      }
+    }
+
     return {
       ...prepared,
       manifest,
@@ -456,6 +528,7 @@ export async function runObservationPrecompute(projectRoot, {
       ready: manifest.status === 'ready'
     };
   } finally {
+    audioDescriber?.close();
     await releasePackageLock();
   }
 }

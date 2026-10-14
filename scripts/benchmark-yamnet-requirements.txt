@@ -1,0 +1,5 @@
+tensorflow==2.20.0
+tensorflow-hub==0.16.1
+tf-keras==2.20.1
+setuptools==80.9.0
+numpy==2.5.3

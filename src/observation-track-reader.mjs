@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 
 import { validateObservationPrecomputeManifest } from './observation-precompute-plan.mjs';
+import { AUDIO_NOT_PREPARED, validateAudioPayload } from './audio-descriptions.mjs';
 
 function requireNonNegativeInteger(value, label) {
   if (!Number.isSafeInteger(value) || value < 0) {
@@ -48,15 +49,18 @@ function emptyWindow(manifest, fromMs, toMs, effectiveFromMs, revealThroughMs) {
     planId: manifest.planId,
     visualStatus: visualStatusOf(manifest),
     dialogueTrack: manifest.dialogueTrack || null,
+    audioTrack: manifest.audioTrack || AUDIO_NOT_PREPARED,
     aiReadiness: manifest.aiReadiness || null,
     requestedRange: { fromMs, toMs },
     deliveredRange: { fromMs: effectiveFromMs, toMs: effectiveFromMs },
     revealThroughMs,
     observations: [],
     dialogue: [],
+    audioDescriptions: [],
     nextCursorMs: effectiveFromMs,
     hasMore: false,
-    dialogueHasMore: false
+    dialogueHasMore: false,
+    audioHasMore: false
   };
 }
 
@@ -66,7 +70,8 @@ export async function readObservationTrackWindow(packageDir, {
   playheadMs,
   lookaheadMs = 1_000,
   maxItems = 24,
-  maxDialogueItems = 80
+  maxDialogueItems = 80,
+  maxAudioItems = 20
 }) {
   fromMs = requireNonNegativeInteger(fromMs, 'fromMs');
   toMs = requireNonNegativeInteger(toMs, 'toMs');
@@ -74,6 +79,8 @@ export async function readObservationTrackWindow(packageDir, {
   lookaheadMs = requireNonNegativeInteger(lookaheadMs, 'lookaheadMs');
   maxItems = requirePositiveInteger(maxItems, 'maxItems');
   maxDialogueItems = requirePositiveInteger(maxDialogueItems, 'maxDialogueItems');
+  maxAudioItems = requirePositiveInteger(maxAudioItems, 'maxAudioItems');
+  if (maxAudioItems > 100) throw new RangeError('maxAudioItems must not exceed 100.');
   if (maxItems > 100) throw new RangeError('maxItems must not exceed 100.');
   if (maxDialogueItems > 300) throw new RangeError('maxDialogueItems must not exceed 300.');
   if (toMs < fromMs) throw new RangeError('toMs must be greater than or equal to fromMs.');
@@ -95,6 +102,7 @@ export async function readObservationTrackWindow(packageDir, {
 
   const visualCandidates = [];
   const dialogueById = new Map();
+  const audioById = new Map();
   for (const chunk of manifest.chunks) {
     if (chunk.status !== 'complete') continue;
     if (chunk.logicalEndMs <= effectiveFromMs || chunk.logicalStartMs >= effectiveToMs) continue;
@@ -118,6 +126,16 @@ export async function readObservationTrackWindow(packageDir, {
         });
       }
     }
+    if (chunk.audioRef && chunk.audioStatus === 'ready') {
+      const audioPayload = validateAudioPayload(await readJson(join(absolutePackageDir, chunk.audioRef)), chunk);
+      for (const description of audioPayload.descriptions) {
+        // Deliver on completion, not overlap: a caption can describe the END of its audio clip.
+        // Audio never uses the optional visual/dialogue lookahead allowance.
+        if (description.availableAtMs <= effectiveFromMs
+            || description.availableAtMs > Math.min(effectiveToMs, playheadMs)) continue;
+        audioById.set(description.id, { ...description, sourceChunkId: chunk.chunkId });
+      }
+    }
   }
 
   visualCandidates.sort((left, right) => left.fromMs - right.fromMs || left.toMs - right.toMs);
@@ -125,28 +143,38 @@ export async function readObservationTrackWindow(packageDir, {
     .sort((left, right) => left.fromMs - right.fromMs || left.toMs - right.toMs);
   const observations = visualCandidates.slice(0, maxItems);
   const dialogue = dialogueCandidates.slice(0, maxDialogueItems);
+  const audioCandidates = [...audioById.values()].sort((a, b) => a.availableAtMs - b.availableAtMs);
+  const audioDescriptions = audioCandidates.slice(0, maxAudioItems);
+  const audioHasMore = audioCandidates.length > audioDescriptions.length;
   const hasMore = visualCandidates.length > observations.length;
   const dialogueHasMore = dialogueCandidates.length > dialogue.length;
   const deliveredEnds = [
     ...observations.map((item) => item.toMs),
-    ...dialogue.map((item) => item.toMs)
+    ...dialogue.map((item) => item.toMs),
+    ...audioDescriptions.map((item) => item.availableAtMs)
   ];
-  const nextCursorMs = deliveredEnds.length > 0
+  let nextCursorMs = deliveredEnds.length > 0
     ? Math.max(...deliveredEnds)
     : effectiveToMs;
+  // Never skip a not-yet-deliverable audio caption via a longer dialogue cue or lookahead.
+  if (manifest.audioTrack) nextCursorMs = Math.min(nextCursorMs, effectiveToMs, playheadMs);
+  if (audioHasMore) nextCursorMs = Math.min(nextCursorMs, audioCandidates[maxAudioItems].availableAtMs - 1);
 
   return {
     planId: manifest.planId,
     visualStatus: visualStatusOf(manifest),
     dialogueTrack: manifest.dialogueTrack || null,
+    audioTrack: manifest.audioTrack || AUDIO_NOT_PREPARED,
     aiReadiness: manifest.aiReadiness || null,
     requestedRange: { fromMs, toMs },
     deliveredRange: { fromMs: effectiveFromMs, toMs: effectiveToMs },
     revealThroughMs,
     observations,
     dialogue,
+    audioDescriptions,
     nextCursorMs,
     hasMore,
-    dialogueHasMore
+    dialogueHasMore,
+    audioHasMore
   };
 }

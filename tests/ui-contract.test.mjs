@@ -196,7 +196,17 @@ test('first-time AI preparation asks which discovered dialogue track to use', as
   assert.match(app, /function chooseAiDialogueTrack\(item\)/);
   assert.match(app, /await chooseAiDialogueTrack\(item\)/);
   assert.match(app, /JSON\.stringify\(dialogueTrackId \? \{ dialogueTrackId \} : \{\}\)/);
-  assert.match(app, /aiButton\.disabled = item\.aiPackage\?\.status === 'ready' \|\| item\.aiPackage\?\.status === 'running'/);
+  const audioButtonState = app.match(/const audioReady = [\s\S]*?aiButton\.disabled = [\s\S]*?;/)?.[0];
+  assert.ok(audioButtonState, 'audio preparation button state is present');
+  const buttonDisabled = new Function('item', 'aiPackageLabel', `const aiButton = {}; ${audioButtonState} return aiButton.disabled;`);
+  for (const status of ['not_prepared', 'unavailable', 'failed', 'running']) {
+    assert.equal(buttonDisabled({ aiPackage: { status: 'ready', audioTrack: { status } } }, () => ''), false);
+  }
+  for (const status of ['ready', 'source_missing']) {
+    assert.equal(buttonDisabled({ aiPackage: { status: 'ready', audioTrack: { status, model: 'Labbeti/conette' } } }, () => ''), true);
+  }
+  assert.equal(buttonDisabled({ aiPackage: { status: 'ready', audioTrack: { status: 'ready', model: 'Qwen/Qwen2.5-Omni-3B' } } }, () => ''), false);
+  assert.equal(buttonDisabled({ aiPackage: { status: 'running' } }, () => ''), true);
   assert.match(server, /preferredDialogueTrackId:\s*body\.dialogueTrackId/);
 });
 

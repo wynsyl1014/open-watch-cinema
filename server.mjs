@@ -24,7 +24,7 @@ import {
   syncMediaIndex,
   updateSessionPlayback
 } from './src/database.mjs';
-import { buildCinemaTick } from './src/cinema-tick.mjs';
+import { buildCinemaTick, cinemaTickRange } from './src/cinema-tick.mjs';
 import { parseSingleRange } from './src/http-range.mjs';
 import {
   prepareMediaPlayback,
@@ -38,6 +38,7 @@ import {
 } from './src/observation-manager.mjs';
 import { runObservationPrecompute } from './src/observation-precompute-runner.mjs';
 import { readObservationTrackWindow } from './src/observation-track-reader.mjs';
+import { getAudioDescriptionStatus } from './src/audio-descriptions.mjs';
 import { readSpoilerGatedStoryboardFrame } from './src/storyboard-frame.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -55,6 +56,7 @@ const STATIC_FILES = new Map([
   ['/index.html', ['index.html', 'text/html; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/playback-sync.js', ['playback-sync.js', 'text/javascript; charset=utf-8']],
   ['/subtitle-utils.js', ['subtitle-utils.js', 'text/javascript; charset=utf-8']]
 ]);
 
@@ -336,9 +338,14 @@ function startAiPreparationJob(item, { preferredDialogueTrackId = null } = {}) {
         sourceMediaId: item.id,
         sourceRelativePath: item.relativePath,
         preferredDialogueTrackId,
+        includeAudio: true,
         onChunkComplete({ progress, chunk }) {
-          job.progress = progress.percent;
+          job.progress = progress.percent / 2;
           job.stage = `Prepared ${chunk.chunkId}`;
+        },
+        onAudioProgress({ throughMs, durationMs }) {
+          job.progress = 50 + 50 * throughMs / durationMs;
+          job.stage = `Describing audio · ${Math.floor(throughMs / 60_000)}:${String(Math.floor(throughMs / 1000) % 60).padStart(2, '0')} analyzed`;
         }
       });
       await rescanMedia();
@@ -349,6 +356,12 @@ function startAiPreparationJob(item, { preferredDialogueTrackId = null } = {}) {
       job.message = job.experienceMode === 'visual_only'
         ? 'Visual analysis is ready. No timed dialogue source was found, so AI viewing will continue in visual-only mode.'
         : 'Visual and dialogue tracks are ready on the same chunk timeline.';
+      const audioStatus = result.manifest.audioTrack?.status;
+      job.message += audioStatus === 'ready'
+        ? ' Audio descriptions are ready too.'
+        : audioStatus === 'source_missing'
+          ? ' This film has no audio stream.'
+          : ` Audio descriptions are not prepared. ${result.manifest.audioTrack?.note || 'Run the optional audio setup, then choose Add audio descriptions.'}`;
       job.finishedAt = new Date().toISOString();
     } catch (error) {
       console.error('AI package preparation failed:', error);
@@ -356,6 +369,7 @@ function startAiPreparationJob(item, { preferredDialogueTrackId = null } = {}) {
       job.stage = 'AI preparation failed';
       job.error = error.message;
       job.finishedAt = new Date().toISOString();
+      await rescanMedia();
     }
   })();
 
@@ -524,7 +538,7 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, {
         ok: true,
         apiVersion: '0.5.0',
-        capabilities: ['ai-package-v1', 'ai-window-v1', 'ai-tick-v1', 'ai-frame-v1', 'cascade-delete-v1'],
+        capabilities: ['ai-package-v1', 'ai-window-v1', 'ai-tick-v1', 'ai-frame-v1', 'audio-descriptions-v1', 'cascade-delete-v1'],
         mediaCount: mediaById.size,
         mediaFolder: 'local-data/media',
         activePreparationCount: [...compatibilityJobs.values()].filter((job) => ['checking', 'processing'].includes(job.status)).length,
@@ -536,7 +550,10 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (request.method === 'GET' && pathname === '/api/observer/status') {
-      sendJson(response, 200, { observer: await getObserverStatus(ROOT) });
+      sendJson(response, 200, {
+        observer: await getObserverStatus(ROOT),
+        audio: await getAudioDescriptionStatus(ROOT, LOCAL_DATA_ROOT)
+      });
       return;
     }
 
@@ -613,7 +630,8 @@ const server = http.createServer(async (request, response) => {
       try {
         const room = updateSessionPlayback(database, playbackMatch[1], {
           mediaTimeMs: Number(body.mediaTimeMs) || 0,
-          playbackState: body.playbackState
+          playbackState: body.playbackState,
+          seeked: body.seeked === true
         });
         sendJson(response, 200, { room: publicSession(room) });
       } catch (error) {
@@ -749,12 +767,17 @@ const server = http.createServer(async (request, response) => {
       const suppliedMediaCursor = Object.hasOwn(cursors, 'mediaMs');
       const mediaCursorMs = suppliedMediaCursor
         ? readIntegerValue(cursors.mediaMs, 'cursors.mediaMs', 0)
-        : Math.max(0, playheadMs - initialWindowMs);
-      const seekDetected = suppliedMediaCursor && mediaCursorMs > playheadMs;
-      const fromMs = seekDetected
-        ? Math.max(0, playheadMs - initialWindowMs)
-        : Math.min(mediaCursorMs, playheadMs);
-      let toMs = Math.min(playheadMs, fromMs + maxAdvanceMs);
+        : undefined;
+      const range = cinemaTickRange({
+        playheadMs,
+        mediaCursorMs,
+        seekVersion: room.seekVersion,
+        cursorSeekVersion: readIntegerValue(cursors.seekVersion, 'cursors.seekVersion', 0),
+        initialWindowMs,
+        maxAdvanceMs
+      });
+      const { fromMs } = range;
+      let { toMs } = range;
 
       try {
         const messageRows = listSessionMessages(database, room.id, {
@@ -775,15 +798,20 @@ const server = http.createServer(async (request, response) => {
             maxItems: 100,
             maxDialogueItems: 300
           });
-          if (!window.hasMore && !window.dialogueHasMore) break;
+          if (!window.hasMore && !window.dialogueHasMore && !window.audioHasMore) break;
           const spanMs = toMs - fromMs;
           if (spanMs <= 1) {
             throw new Error('The AI tick range is too dense to deliver without dropping material.');
           }
           toMs = fromMs + Math.max(1, Math.floor(spanMs / 2));
         }
-        if (window.hasMore || window.dialogueHasMore) {
+        if (window.hasMore || window.dialogueHasMore || window.audioHasMore) {
           throw new Error('The AI tick range could not be compacted without dropping material.');
+        }
+        const latestRoom = getSession(database, room.id);
+        if (!latestRoom || latestRoom.status !== 'active' || latestRoom.seekVersion !== room.seekVersion
+            || latestRoom.lastPositionMs < playheadMs) {
+          throw new Error('Playback changed during this tick. Retry with the same cursors.');
         }
         const tick = buildCinemaTick({
           room,
@@ -792,13 +820,7 @@ const server = http.createServer(async (request, response) => {
           consumerName,
           liveObservations: observationRows.slice(0, maxLiveObservations),
           inputCursors: { messageId, observationSequence },
-          targetRange: {
-            fromMs,
-            toMs,
-            playheadMs,
-            seekDetected,
-            bootstrap: !suppliedMediaCursor
-          },
+          targetRange: { ...range, toMs },
           messageHasMore: messageRows.length > maxMessages,
           observationHasMore: observationRows.length > maxLiveObservations,
           limits: { maxStoryboards, maxMotionEvents }
@@ -842,9 +864,17 @@ const server = http.createServer(async (request, response) => {
           {
             storyboardRef,
             mediaTimeMs,
+            quality: url.searchParams.get('quality') || 'storyboard',
+            inputPath: item.absolutePath,
             playheadMs: Math.max(0, Math.round(Number(room.lastPositionMs) || 0))
           }
         );
+        const latestRoom = getSession(database, room.id);
+        if (!latestRoom || latestRoom.seekVersion !== room.seekVersion
+            || latestRoom.status !== room.status || latestRoom.lastPositionMs < room.lastPositionMs) {
+          sendJson(response, 409, { error: 'Playback changed while reading the frame. Retry at the current playhead.' });
+          return;
+        }
         const metadataHeader = Buffer.from(JSON.stringify(frame.metadata), 'utf8').toString('base64url');
         response.writeHead(200, {
           'content-type': frame.mimeType,
@@ -889,7 +919,7 @@ const server = http.createServer(async (request, response) => {
         }
         return value;
       };
-      const playheadMs = readInteger('playheadMs', room.lastPositionMs);
+      const playheadMs = Math.min(room.lastPositionMs, readInteger('playheadMs', room.lastPositionMs));
       const fromMs = readInteger('fromMs', Math.max(0, playheadMs - 10_000));
       const toMs = readInteger('toMs', playheadMs + 1_000);
       const lookaheadMs = readInteger('lookaheadMs', 1_000, { max: 30_000 });
@@ -905,6 +935,11 @@ const server = http.createServer(async (request, response) => {
           maxItems,
           maxDialogueItems
         });
+        const latestRoom = getSession(database, room.id);
+        if (!latestRoom || latestRoom.status !== 'active' || latestRoom.seekVersion !== room.seekVersion
+            || latestRoom.lastPositionMs < playheadMs) {
+          throw new Error('Playback changed during this window. Retry at the current playhead.');
+        }
         sendJson(response, 200, {
           room: publicSession(room),
           media: publicMediaItem(listIndexedMedia(database).find((candidate) => candidate.id === item.id)),

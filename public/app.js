@@ -1,3 +1,5 @@
+import { createPlaybackSync } from './playback-sync.js';
+
 const SUBTITLE_TIMESTAMP_PATTERN = /^(?:(\d{1,}):)?(\d{2}):(\d{2})\.(\d{3})$/;
 
 function parseSubtitleTimestamp(value) {
@@ -201,7 +203,6 @@ let pendingSeekMs = null;
 let timelineShown = new Set();
 let lastTimelineMs = -1;
 let danmakuLane = 0;
-let playbackSyncTimer = null;
 let controlsHideTimer = null;
 let lastProgressWriteAt = 0;
 let danmakuEnabled = localStorage.getItem(STORAGE.danmaku) !== 'false';
@@ -711,7 +712,7 @@ function aiPackageLabel(item) {
     const mode = aiPackage.aiReadiness?.experienceMode;
     if (mode === 'visual_only') return 'AI ready · visual only';
     if (mode === 'dialogue_only') return 'AI ready · dialogue only';
-    return 'AI package ready';
+    return aiPackage.audioTrack?.status === 'ready' ? 'AI ready · audio described' : 'AI package ready';
   }
   if (aiPackage.status === 'running') {
     return `AI preparing · ${Math.round(aiPackage.progress?.percent || 0)}%`;
@@ -1097,8 +1098,9 @@ async function pollAiPreparation(jobId, button, statusText) {
 }
 
 async function prepareAiMedia(item, button, statusText) {
-  await discoverEmbeddedSubtitles(item);
-  const dialogueTrackId = await chooseAiDialogueTrack(item);
+  const audioOnly = item.aiPackage?.status === 'ready';
+  if (!audioOnly) await discoverEmbeddedSubtitles(item);
+  const dialogueTrackId = audioOnly ? preferredAiDialogueTrackId(item) : await chooseAiDialogueTrack(item);
   if (dialogueTrackId === undefined) return;
 
   const selectedTrack = (item.subtitleTracks || []).find((track) => track.id === dialogueTrackId) || null;
@@ -1106,7 +1108,9 @@ async function prepareAiMedia(item, button, statusText) {
   button.textContent = 'Starting AI preparation…';
   statusText.hidden = false;
   statusText.classList.remove('error');
-  statusText.textContent = selectedTrack
+  statusText.textContent = audioOnly
+    ? 'Adding audio descriptions to the existing AI package…'
+    : selectedTrack
     ? `Preparing visual analysis with ${subtitleOptionLabel(selectedTrack)} as the AI dialogue track.`
     : 'No timed subtitle track was found. The AI package will prepare visual analysis only.';
 
@@ -1285,10 +1289,13 @@ function renderMedia(items) {
     const aiButton = document.createElement('button');
     aiButton.type = 'button';
     aiButton.className = 'prepare-button ai-prepare-button';
+    const audioReady = item.aiPackage?.audioTrack?.status === 'source_missing'
+      || (item.aiPackage?.audioTrack?.status === 'ready' && item.aiPackage?.audioTrack?.model === 'Labbeti/conette');
     aiButton.textContent = item.aiPackage?.status === 'ready'
-      ? aiPackageLabel(item)
+      ? audioReady ? aiPackageLabel(item) : 'Add audio descriptions'
       : 'Prepare for AI viewing';
-    aiButton.disabled = item.aiPackage?.status === 'ready' || item.aiPackage?.status === 'running';
+    aiButton.disabled = (item.aiPackage?.status === 'ready' && audioReady)
+      || item.aiPackage?.status === 'running';
     aiButton.addEventListener('click', () => prepareAiMedia(item, aiButton, statusText));
     actionButtons.append(aiButton);
 
@@ -1296,7 +1303,13 @@ function renderMedia(items) {
     const aiWarning = aiExperienceWarning(item);
     aiStatus.className = 'ai-package-note';
     aiStatus.classList.toggle('warning', Boolean(aiWarning));
-    aiStatus.textContent = aiWarning || aiPackageLabel(item);
+    aiStatus.textContent = aiWarning || (item.aiPackage?.audioTrack?.status === 'failed'
+      ? 'Audio descriptions were interrupted. Add audio descriptions to resume.'
+      : item.aiPackage?.audioTrack?.status === 'running'
+        ? 'Preparing audio descriptions…'
+        : item.aiPackage?.status === 'ready' && !audioReady
+          ? 'Visuals ready · audio descriptions not prepared'
+          : aiPackageLabel(item));
 
     actionArea.append(actionButtons, aiStatus, statusText);
     card.append(actionArea);
@@ -1546,25 +1559,29 @@ async function sendRoomMessage(content) {
   }
 }
 
-function schedulePlaybackSync() {
-  if (!activeRoom) return;
-  clearTimeout(playbackSyncTimer);
-  playbackSyncTimer = setTimeout(async () => {
-    if (!activeRoom) return;
-    try {
-      const payload = await fetchJson(`/api/rooms/${activeRoom.id}/playback`, {
-        method: 'POST',
-        body: JSON.stringify({
-          mediaTimeMs: Math.round(videoPlayer.currentTime * 1000),
-          playbackState: videoPlayer.paused ? 'paused' : 'playing'
-        })
-      });
+const queuePlaybackSync = createPlaybackSync({
+  async send({ roomId, ...playback }) {
+    if (!roomIsWritable() || activeRoom.id !== roomId) return;
+    const payload = await fetchJson(`/api/rooms/${roomId}/playback`, {
+      method: 'POST',
+      body: JSON.stringify(playback)
+    });
+    if (roomIsWritable() && activeRoom.id === roomId) {
       activeRoom = payload.room;
       selectedRoom = payload.room;
-    } catch (error) {
-      console.error(error);
     }
-  }, 250);
+  },
+  onError: (error) => console.error(error)
+});
+
+function schedulePlaybackSync({ seeked = false } = {}) {
+  if (!roomIsWritable() || videoPlayer.seeking) return;
+  queuePlaybackSync({
+    roomId: activeRoom.id,
+    mediaTimeMs: Math.round(videoPlayer.currentTime * 1000),
+    playbackState: videoPlayer.paused ? 'paused' : 'playing',
+    seeked
+  });
 }
 
 rescanButton.addEventListener('click', () => refreshLibrary({ rescan: true }));
@@ -1742,7 +1759,7 @@ videoPlayer.addEventListener('ended', () => savePlaybackProgress({ force: true }
 videoPlayer.addEventListener('seeked', () => {
   resetTimeline(Math.round(videoPlayer.currentTime * 1000));
   savePlaybackProgress({ force: true });
-  schedulePlaybackSync();
+  schedulePlaybackSync({ seeked: true });
 });
 
 window.addEventListener('pagehide', () => savePlaybackProgress({ force: true }));

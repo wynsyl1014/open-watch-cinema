@@ -9,6 +9,8 @@ local-data/media/*
 
 # Optional observer environment and Python caches stay machine-local.
 observer/.venv/
+observer/.audio-venv/
+observer/.conette-venv/
 observer/__pycache__/
 *.pyc
 

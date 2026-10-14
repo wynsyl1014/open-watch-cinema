@@ -1,3 +1,5 @@
+import { selectVisualArc, similarComposition } from './storyboard-selection.mjs';
+
 const DEFAULT_LIMITS = Object.freeze({
   maxStoryboards: 5,
   maxMotionEvents: 8
@@ -5,29 +7,6 @@ const DEFAULT_LIMITS = Object.freeze({
 
 function safeInteger(value, fallback = 0) {
   return Number.isSafeInteger(value) && value >= 0 ? value : fallback;
-}
-
-function scoreObservation(observation) {
-  const kindWeight = observation.kind === 'scene_change'
-    ? 2
-    : observation.kind === 'motion_peak'
-      ? 1
-      : 0;
-  return kindWeight
-    + Math.max(0, Number(observation.sceneScore) || 0) * 2
-    + Math.max(0, Number(observation.motionScore) || 0);
-}
-
-function uniqueBy(items, keyOf) {
-  const seen = new Set();
-  const result = [];
-  for (const item of items) {
-    const key = keyOf(item);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(item);
-  }
-  return result;
 }
 
 function selectStoryboards(observations, maximum) {
@@ -44,26 +23,19 @@ function selectStoryboards(observations, maximum) {
         safeInteger(observation.fromMs)
       ),
       frameReason: observation.storyboard.frameReason || observation.kind || 'visual_event',
-      dedupKey: observation.storyboard.perceptualHash || observation.storyboard.storyboardRef,
+      hash: observation.storyboard.perceptualHash,
+      rgb: observation.storyboard.averageRgb || observation.metrics?.averageRgb,
       storyboardRef: observation.storyboard.storyboardRef,
-      importance: scoreObservation(observation)
     }));
-
-  const deduplicated = uniqueBy(
-    candidates,
-    (item) => item.dedupKey
-  );
-  if (deduplicated.length <= maximum) {
-    return deduplicated
-      .sort((left, right) => left.mediaTimeMs - right.mediaTimeMs)
-      .map(({ importance, dedupKey, ...item }) => item);
+  const compositions = [];
+  for (const frame of candidates) {
+    let group = compositions.findIndex((other) => (
+      frame.storyboardRef === other.storyboardRef || similarComposition(frame, other)
+    ));
+    if (group < 0) { group = compositions.length; compositions.push(frame); }
+    frame.visualGroup = group;
   }
-
-  return deduplicated
-    .sort((left, right) => right.importance - left.importance || left.mediaTimeMs - right.mediaTimeMs)
-    .slice(0, maximum)
-    .sort((left, right) => left.mediaTimeMs - right.mediaTimeMs)
-    .map(({ importance, dedupKey, ...item }) => item);
+  return selectVisualArc(candidates, maximum).map(({ hash, rgb, ...item }) => item);
 }
 
 function compactMotionEvent(observation, source = 'precomputed') {
@@ -127,6 +99,26 @@ function compactMessage(message) {
   };
 }
 
+export function cinemaTickRange({
+  playheadMs, mediaCursorMs, seekVersion, cursorSeekVersion,
+  initialWindowMs, maxAdvanceMs
+}) {
+  const bootstrap = mediaCursorMs === undefined;
+  const seekDetected = !bootstrap && (
+    cursorSeekVersion !== seekVersion || mediaCursorMs > playheadMs
+  );
+  const fromMs = bootstrap || seekDetected
+    ? Math.max(0, playheadMs - initialWindowMs)
+    : Math.min(mediaCursorMs, playheadMs);
+  return {
+    fromMs,
+    toMs: Math.min(playheadMs, fromMs + maxAdvanceMs),
+    playheadMs,
+    seekDetected,
+    bootstrap
+  };
+}
+
 export function buildCinemaTick({
   room,
   window,
@@ -174,6 +166,7 @@ export function buildCinemaTick({
     targetRange.playheadMs > requestedToMs
     || window.hasMore
     || window.dialogueHasMore
+    || window.audioHasMore
   );
   const lastMessageId = exactMessages.length > 0
     ? safeInteger(exactMessages.at(-1).id, safeInteger(inputCursors.messageId))
@@ -197,6 +190,7 @@ export function buildCinemaTick({
       playheadMs: safeInteger(targetRange.playheadMs),
       state: room.playbackState,
       version: safeInteger(room.playbackVersion),
+      seekVersion: safeInteger(room.seekVersion),
       updatedAt: room.updatedAt
     },
     range: {
@@ -208,6 +202,11 @@ export function buildCinemaTick({
     },
     newMessages: deliveredMessages.map(compactMessage),
     dialogueDelta: dialogue.map(compactDialogue),
+    audioDescriptions: (window.audioDescriptions || [])
+      .filter((item) => item.availableAtMs <= Math.min(requestedToMs, targetRange.playheadMs))
+      .map(({ id, fromMs, toMs, availableAtMs, text, source, sourceChunkId }) => ({
+        id, fromMs, toMs, availableAtMs, text, source, sourceChunkId
+      })),
     storyboards: selectStoryboards(observations, maxStoryboards),
     motionEvents: selectMotionEvents(
       observations,
@@ -216,6 +215,7 @@ export function buildCinemaTick({
     ),
     cursors: {
       mediaMs: requestedToMs,
+      seekVersion: safeInteger(room.seekVersion),
       messageId: lastMessageId,
       observationSequence: lastObservationSequence
     },
@@ -233,6 +233,7 @@ export function buildCinemaTick({
     availability: {
       visualStatus: window.visualStatus || null,
       dialogueTrack: window.dialogueTrack || null,
+      audioTrack: window.audioTrack || { status: 'not_prepared' },
       aiReadiness: window.aiReadiness || null
     },
     compacted: {

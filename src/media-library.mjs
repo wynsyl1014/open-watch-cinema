@@ -43,6 +43,7 @@ async function readAiPackage(aiPackagesRoot, mediaId) {
       progress: manifest.progress || null,
       visualTrack: manifest.visualTrack || null,
       dialogueTrack: manifest.dialogueTrack || null,
+      audioTrack: manifest.audioTrack || { status: 'not_prepared' },
       aiReadiness: manifest.aiReadiness || null,
       packageRef: `ai-packages/${mediaId}`,
       updatedAt: manifest.updatedAt || null
@@ -54,6 +55,7 @@ async function readAiPackage(aiPackagesRoot, mediaId) {
       progress: null,
       visualTrack: null,
       dialogueTrack: null,
+      audioTrack: { status: 'unavailable' },
       aiReadiness: {
         status: 'incomplete',
         ready: false,
