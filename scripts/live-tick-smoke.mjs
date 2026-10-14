@@ -1,4 +1,5 @@
-import { spawn } from 'node:child_process';
+import assert from 'node:assert/strict';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -100,7 +101,11 @@ try {
     mkdir(mediaRoot, { recursive: true }),
     mkdir(storyboardDir, { recursive: true })
   ]);
-  await writeFile(join(mediaRoot, relativeMediaPath), Buffer.from([0]));
+  execFileSync('ffmpeg', [
+    '-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=1280x720:d=30:r=1',
+    '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p',
+    join(mediaRoot, relativeMediaPath)
+  ], { windowsHide: true });
   await writeFile(join(storyboardDir, 'scene.jpg'), Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
 
   let manifest = createObservationPrecomputeManifest({
@@ -272,6 +277,13 @@ try {
       }
     }
   }));
+  const incompleteCursor = await client.request('tools/call', {
+    name: 'open_watch_cinema_tick',
+    arguments: { roomId: room.id, consumerName: 'Elias', cursors: { mediaMs: first.tick.cursors.mediaMs } }
+  });
+  assert.equal(incompleteCursor.result?.isError, true);
+  assert.match(JSON.stringify(incompleteCursor), /mediaMs requires seekVersion/);
+
   const second = toolPayload(await client.request('tools/call', {
     name: 'open_watch_cinema_tick',
     arguments: {
@@ -301,7 +313,6 @@ try {
   if (!frameMetadata?.text?.includes('scene.jpg')) {
     throw new Error('MCP frame tool did not return verified storyboard metadata.');
   }
-
   const serialized = JSON.stringify(first.tick);
   for (const forbidden of ['brightness', 'averageRgb', 'histogramDistance', 'perceptualHash']) {
     if (serialized.includes(`\"${forbidden}\"`)) {
@@ -322,6 +333,56 @@ try {
     throw new Error('Second tick did not finish the remaining media increment.');
   }
 
+  async function playback(mediaTimeMs, playbackState = 'paused', seeked = false) {
+    const response = await fetch(`${baseUrl}/api/rooms/${room.id}/playback`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mediaTimeMs, playbackState, seeked })
+    });
+    assert.equal(response.status, 200);
+    return (await response.json()).room;
+  }
+  async function poll(cursors) {
+    return toolPayload(await client.request('tools/call', {
+      name: 'open_watch_cinema_tick',
+      arguments: { roomId: room.id, consumerName: 'Elias', cursors }
+    })).tick;
+  }
+
+  // Start at five seconds, then skip the first cue and storyboard.
+  await playback(5_000, 'paused', true);
+  const beforeSeek = await poll(second.tick.cursors);
+  assert.equal(beforeSeek.range.seekDetected, true);
+  await playback(29_000, 'paused', true);
+  // A following pause/resume update must not erase the seek version.
+  const resumed = await playback(29_000, 'playing');
+  const forward = await poll(beforeSeek.cursors);
+  assert.equal(forward.range.seekDetected, true);
+  assert.equal(forward.range.fromMs, 14_000);
+  assert.equal(forward.cursors.mediaMs, 29_000);
+  assert.equal(forward.cursors.seekVersion, resumed.seekVersion);
+  assert.deepEqual(forward.dialogueDelta.map((cue) => cue.cueId), ['cue-two']);
+  assert.equal(forward.storyboards.length, 0);
+  assert.equal(forward.newMessages.length, 0);
+  assert.equal(forward.cursors.messageId, second.tick.cursors.messageId);
+  assert.equal(forward.cursors.observationSequence, second.tick.cursors.observationSequence);
+  // Each consumer acknowledges independently; one poll cannot consume the seek for others.
+  assert.equal((await poll(beforeSeek.cursors)).range.seekDetected, true);
+  const steady = await poll(forward.cursors);
+  assert.equal(steady.range.seekDetected, false);
+  assert.equal(steady.dialogueDelta.length, 0);
+  assert.equal(steady.more.media, false);
+
+  await playback(28_000, 'paused', true);
+  await playback(27_000, 'paused', true);
+  const backward = await poll(forward.cursors);
+  assert.equal(backward.range.seekDetected, true);
+  assert.equal(backward.range.fromMs, 12_000);
+  assert.equal(backward.cursors.mediaMs, 27_000);
+  assert.equal(backward.cursors.seekVersion, forward.cursors.seekVersion + 2);
+  assert.equal(backward.playback.state, 'paused');
+  assert.equal((await poll(backward.cursors)).range.seekDetected, false);
+
   console.log(JSON.stringify({
     ok: true,
     apiVersion: health.apiVersion,
@@ -341,6 +402,7 @@ try {
       motionEvents: second.tick.motionEvents.length
     },
     secondCursors: second.tick.cursors,
+    seekChecks: 'forward, backward, repeated, paused, independent consumers, no replay',
     rawTelemetryOmitted: first.tick.compacted.rawVisualMetricsOmitted,
     selfMessagesOmitted: first.tick.compacted.selfMessagesOmitted,
     detailedWindowToolAvailable: first.tick.compacted.detailedWindowToolAvailable

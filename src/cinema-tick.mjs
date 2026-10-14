@@ -127,6 +127,26 @@ function compactMessage(message) {
   };
 }
 
+export function cinemaTickRange({
+  playheadMs, mediaCursorMs, seekVersion, cursorSeekVersion,
+  initialWindowMs, maxAdvanceMs
+}) {
+  const bootstrap = mediaCursorMs === undefined;
+  const seekDetected = !bootstrap && (
+    cursorSeekVersion !== seekVersion || mediaCursorMs > playheadMs
+  );
+  const fromMs = bootstrap || seekDetected
+    ? Math.max(0, playheadMs - initialWindowMs)
+    : Math.min(mediaCursorMs, playheadMs);
+  return {
+    fromMs,
+    toMs: Math.min(playheadMs, fromMs + maxAdvanceMs),
+    playheadMs,
+    seekDetected,
+    bootstrap
+  };
+}
+
 export function buildCinemaTick({
   room,
   window,
@@ -197,6 +217,7 @@ export function buildCinemaTick({
       playheadMs: safeInteger(targetRange.playheadMs),
       state: room.playbackState,
       version: safeInteger(room.playbackVersion),
+      seekVersion: safeInteger(room.seekVersion),
       updatedAt: room.updatedAt
     },
     range: {
@@ -216,6 +237,7 @@ export function buildCinemaTick({
     ),
     cursors: {
       mediaMs: requestedToMs,
+      seekVersion: safeInteger(room.seekVersion),
       messageId: lastMessageId,
       observationSequence: lastObservationSequence
     },

@@ -71,6 +71,10 @@ The adapter exposes twelve tools:
 
 During ordinary viewing, repeatedly call `open_watch_cinema_tick`, set `consumerName` to the same stable AI name used by `cinema_post_message`, and pass the returned `cursors` back unchanged on the next call.
 
+The browser reports completed seeks explicitly. The room persists a `seekVersion`, returned in both `playback` and `cursors`. A changed cursor seek version rebases media delivery to the destination's preceding `initialWindowMs` (15 seconds by default), with `range.seekDetected: true`. Message and live-observation cursors remain independent. Ordinary playback backlog is still delivered incrementally; a large cursor gap alone is not treated as a seek. Every client must return the complete cursor object, including `seekVersion`, to acknowledge the jump once. After upgrading, restart the cinema and MCP adapter and reload the player so seek notifications and the new cursor field are available together.
+
+If a host rejects `cursors.seekVersion`, refresh its cached tool metadata after restarting the adapter. The adapter rejects `mediaMs` without `seekVersion` to prevent repeated destination replay. Preserve the complete returned cursors instead of stripping fields or resetting them. See [seek synchronization](../docs/seek-sync.md) for migration and validation.
+
 Matching self-authored AI messages are omitted from the material packet while the message cursor still advances past them. Each compact tick can contain:
 
 - current playback state;
@@ -130,6 +134,6 @@ npm run smoke:frame
 
 `smoke:mcp` performs a real MCP initialize, resource listing/read, tool listing, health call, and media-list call.
 
-`smoke:tick` creates an isolated temporary cinema and AI package, opens a synthetic room, sends timestamped viewer messages, calls `open_watch_cinema_tick` twice through the MCP adapter, verifies cursor advancement and no replay, then removes the fixture.
+`smoke:tick` creates an isolated temporary cinema and AI package, opens a synthetic room, sends timestamped viewer messages, exercises forward, backward, repeated, and paused seeks through the playback endpoint and MCP adapter, verifies independent cursor advancement, destination context, and no replay, then removes the fixture.
 
 `smoke:frame` verifies the underlying spoiler-gated storyboard image endpoint. The MCP contract tests also verify that `cinema_get_frame` exposes image content only through that room-bound endpoint.

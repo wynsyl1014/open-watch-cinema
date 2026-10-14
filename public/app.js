@@ -1,3 +1,5 @@
+import { createPlaybackSync } from './playback-sync.js';
+
 const SUBTITLE_TIMESTAMP_PATTERN = /^(?:(\d{1,}):)?(\d{2}):(\d{2})\.(\d{3})$/;
 
 function parseSubtitleTimestamp(value) {
@@ -201,7 +203,6 @@ let pendingSeekMs = null;
 let timelineShown = new Set();
 let lastTimelineMs = -1;
 let danmakuLane = 0;
-let playbackSyncTimer = null;
 let controlsHideTimer = null;
 let lastProgressWriteAt = 0;
 let danmakuEnabled = localStorage.getItem(STORAGE.danmaku) !== 'false';
@@ -1546,25 +1547,29 @@ async function sendRoomMessage(content) {
   }
 }
 
-function schedulePlaybackSync() {
-  if (!activeRoom) return;
-  clearTimeout(playbackSyncTimer);
-  playbackSyncTimer = setTimeout(async () => {
-    if (!activeRoom) return;
-    try {
-      const payload = await fetchJson(`/api/rooms/${activeRoom.id}/playback`, {
-        method: 'POST',
-        body: JSON.stringify({
-          mediaTimeMs: Math.round(videoPlayer.currentTime * 1000),
-          playbackState: videoPlayer.paused ? 'paused' : 'playing'
-        })
-      });
+const queuePlaybackSync = createPlaybackSync({
+  async send({ roomId, ...playback }) {
+    if (!roomIsWritable() || activeRoom.id !== roomId) return;
+    const payload = await fetchJson(`/api/rooms/${roomId}/playback`, {
+      method: 'POST',
+      body: JSON.stringify(playback)
+    });
+    if (roomIsWritable() && activeRoom.id === roomId) {
       activeRoom = payload.room;
       selectedRoom = payload.room;
-    } catch (error) {
-      console.error(error);
     }
-  }, 250);
+  },
+  onError: (error) => console.error(error)
+});
+
+function schedulePlaybackSync({ seeked = false } = {}) {
+  if (!roomIsWritable() || videoPlayer.seeking) return;
+  queuePlaybackSync({
+    roomId: activeRoom.id,
+    mediaTimeMs: Math.round(videoPlayer.currentTime * 1000),
+    playbackState: videoPlayer.paused ? 'paused' : 'playing',
+    seeked
+  });
 }
 
 rescanButton.addEventListener('click', () => refreshLibrary({ rescan: true }));
@@ -1742,7 +1747,7 @@ videoPlayer.addEventListener('ended', () => savePlaybackProgress({ force: true }
 videoPlayer.addEventListener('seeked', () => {
   resetTimeline(Math.round(videoPlayer.currentTime * 1000));
   savePlaybackProgress({ force: true });
-  schedulePlaybackSync();
+  schedulePlaybackSync({ seeked: true });
 });
 
 window.addEventListener('pagehide', () => savePlaybackProgress({ force: true }));

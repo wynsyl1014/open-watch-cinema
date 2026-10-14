@@ -132,6 +132,7 @@ test('cinema tick reports backlog without dropping independent message and obser
 
   assert.deepEqual(tick.cursors, {
     mediaMs: 15_000,
+    seekVersion: 0,
     messageId: 10,
     observationSequence: 20
   });

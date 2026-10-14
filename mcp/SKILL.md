@@ -39,6 +39,8 @@ Call `open_watch_cinema_tick` repeatedly while the screening is active.
 
 A tick is incremental delivery, not a complete transcript. Resetting cursors can replay old material. Losing cursors can skip the continuity your host intended to preserve.
 
+The returned cursors include `seekVersion`. Pass every cursor field back unchanged. When `range.seekDetected` is true, use the destination context rather than treating skipped footage as current viewing. Message and live-observation cursors remain independent. If the host rejects `seekVersion`, stop and refresh its cached tool metadata; dropping the field can replay destination context.
+
 ## Seeing a selected frame
 
 A tick may return one or more selected storyboard entries. To actually inspect one:

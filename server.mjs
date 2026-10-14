@@ -24,7 +24,7 @@ import {
   syncMediaIndex,
   updateSessionPlayback
 } from './src/database.mjs';
-import { buildCinemaTick } from './src/cinema-tick.mjs';
+import { buildCinemaTick, cinemaTickRange } from './src/cinema-tick.mjs';
 import { parseSingleRange } from './src/http-range.mjs';
 import {
   prepareMediaPlayback,
@@ -55,6 +55,7 @@ const STATIC_FILES = new Map([
   ['/index.html', ['index.html', 'text/html; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/playback-sync.js', ['playback-sync.js', 'text/javascript; charset=utf-8']],
   ['/subtitle-utils.js', ['subtitle-utils.js', 'text/javascript; charset=utf-8']]
 ]);
 
@@ -613,7 +614,8 @@ const server = http.createServer(async (request, response) => {
       try {
         const room = updateSessionPlayback(database, playbackMatch[1], {
           mediaTimeMs: Number(body.mediaTimeMs) || 0,
-          playbackState: body.playbackState
+          playbackState: body.playbackState,
+          seeked: body.seeked === true
         });
         sendJson(response, 200, { room: publicSession(room) });
       } catch (error) {
@@ -749,12 +751,17 @@ const server = http.createServer(async (request, response) => {
       const suppliedMediaCursor = Object.hasOwn(cursors, 'mediaMs');
       const mediaCursorMs = suppliedMediaCursor
         ? readIntegerValue(cursors.mediaMs, 'cursors.mediaMs', 0)
-        : Math.max(0, playheadMs - initialWindowMs);
-      const seekDetected = suppliedMediaCursor && mediaCursorMs > playheadMs;
-      const fromMs = seekDetected
-        ? Math.max(0, playheadMs - initialWindowMs)
-        : Math.min(mediaCursorMs, playheadMs);
-      let toMs = Math.min(playheadMs, fromMs + maxAdvanceMs);
+        : undefined;
+      const range = cinemaTickRange({
+        playheadMs,
+        mediaCursorMs,
+        seekVersion: room.seekVersion,
+        cursorSeekVersion: readIntegerValue(cursors.seekVersion, 'cursors.seekVersion', 0),
+        initialWindowMs,
+        maxAdvanceMs
+      });
+      const { fromMs } = range;
+      let { toMs } = range;
 
       try {
         const messageRows = listSessionMessages(database, room.id, {
@@ -792,13 +799,7 @@ const server = http.createServer(async (request, response) => {
           consumerName,
           liveObservations: observationRows.slice(0, maxLiveObservations),
           inputCursors: { messageId, observationSequence },
-          targetRange: {
-            fromMs,
-            toMs,
-            playheadMs,
-            seekDetected,
-            bootstrap: !suppliedMediaCursor
-          },
+          targetRange: { ...range, toMs },
           messageHasMore: messageRows.length > maxMessages,
           observationHasMore: observationRows.length > maxLiveObservations,
           limits: { maxStoryboards, maxMotionEvents }

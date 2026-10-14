@@ -252,6 +252,7 @@ const TOOLS = [
           type: 'object',
           properties: {
             mediaMs: { type: 'integer', minimum: 0 },
+            seekVersion: { type: 'integer', minimum: 0, description: 'Required whenever mediaMs is provided. Return the value from the previous tick unchanged.' },
             messageId: { type: 'integer', minimum: 0, default: 0 },
             observationSequence: { type: 'integer', minimum: 0, default: 0 }
           },
@@ -388,7 +389,13 @@ async function callTool(name, rawArguments) {
       const limits = args.limits === undefined ? {} : requireObject(args.limits, 'limits');
       const normalizedCursors = {};
       if (Object.hasOwn(cursors, 'mediaMs')) {
+        if (!Object.hasOwn(cursors, 'seekVersion')) {
+          throw new Error('Cursor schema is out of date: mediaMs requires seekVersion. Refresh the Open Watch Cinema connector tools, then retry with the complete last returned cursors. Do not drop seekVersion or reset cursors to work around this error.');
+        }
         normalizedCursors.mediaMs = requireInteger(cursors.mediaMs, 'cursors.mediaMs');
+      }
+      if (Object.hasOwn(cursors, 'seekVersion')) {
+        normalizedCursors.seekVersion = requireInteger(cursors.seekVersion, 'cursors.seekVersion');
       }
       if (Object.hasOwn(cursors, 'messageId')) {
         normalizedCursors.messageId = requireInteger(cursors.messageId, 'cursors.messageId');
