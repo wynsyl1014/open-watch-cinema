@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open Watch Cinema</title>
+<style data-activity></style>
+<style>
+  :root {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #456B8D;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 16px;
+    background: linear-gradient(108deg, #F8FBFF 36%, #B4C7D8 62%, #EDF5FB 74%, #8FACC5 89%, #456B8D 100%);
+    border: 1px solid #B4C7D8;
+    border-radius: 14px;
+  }
+  h1 { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.25; }
+  .actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: flex;
+    gap: 6px;
+  }
+  button {
+    border: 1px solid #8FACC5;
+    border-radius: 8px;
+    background: #EDF5FB;
+    color: #456B8D;
+    padding: 8px 13px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: #456B8D; }
+  button:focus-visible { outline: 2px solid #456B8D; outline-offset: 2px; }
+  button:disabled { cursor: default; opacity: .6; }
+  time { font-size: 13px; font-variant-numeric: tabular-nums; }
+  p { grid-column: 1 / -1; margin: 3px 0 0; font-size: 13px; line-height: 1.45; }
+  @media (max-width: 360px) {
+    .actions { grid-row: auto; grid-column: 1 / -1; }
+  }
+  [hidden] { display: none !important; }
+  :root[data-display-mode="fullscreen"] {
+    color-scheme: dark;
+    --ink: #e4eef7;
+    --ink-strong: #f2f8ff;
+    --silver: #d1e1ee;
+    --silver-muted: #b2c7d9;
+    --muted: #9fb7cc;
+    --blue-bright: #afd5f1;
+    --mint: #93c6b9;
+    --mint-light: #bce6da;
+    --danger: #ffc8bc;
+    --line: #2b3d51;
+    --line-strong: #48647d;
+    --line-hover: #80a2bf;
+    --glass-border-shell: #385067;
+    --radius-shell: 16px;
+    --radius-control: 8px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-serif: var(--font-sans);
+    --font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+  :root[data-display-mode="fullscreen"] body {
+    min-height: 100dvh;
+    color: #e4eef7;
+    background:
+      radial-gradient(ellipse 54rem 25rem at 50% -9rem, #4b6b8a 0%, #253d54 47%, transparent 90%),
+      linear-gradient(168deg, #142337, #0b1320 59%, #111e2d);
+  }
+  :root[data-display-mode="fullscreen"] main {
+    width: min(100%, 1060px);
+    min-height: 100dvh;
+    margin: 0 auto;
+    padding: clamp(20px, 5vw, 60px) clamp(16px, 5vw, 46px);
+    align-content: start;
+    gap: 8px 16px;
+    background: none;
+    border: 0;
+    border-radius: 0;
+  }
+  :root[data-display-mode="fullscreen"] h1 { font-size: clamp(19px, 3.6vw, 28px); }
+  :root[data-display-mode="fullscreen"] #last-submitted { color: #b8cedf; }
+  :root[data-display-mode="fullscreen"] .actions button {
+    min-height: 40px;
+    border-color: #526c86;
+    background: #253a50;
+    color: #e2edf7;
+  }
+  :root[data-display-mode="fullscreen"] .actions button:hover:not(:disabled) { border-color: #a3bed5; }
+  :root[data-display-mode="fullscreen"] :is(button, summary):focus-visible {
+    outline: 2px solid #a7d2f6;
+    outline-offset: 3px;
+  }
+  :root[data-display-mode="fullscreen"] #watch {
+    background: #c4dbec;
+    color: #12273a;
+    border-color: #d6e9f8;
+  }
+  :root[data-display-mode="fullscreen"] #aiActivityPanel {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    margin-top: clamp(18px, 4vw, 38px);
+  }
+  :root[data-display-mode="fullscreen"] .activity-scroll { max-height: none; overflow: visible; }
+  :root[data-display-mode="fullscreen"] .activity-header { align-items: baseline; }
+  @media (max-width: 580px) {
+    :root[data-display-mode="fullscreen"] .actions { grid-row: auto; grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Open Watch Cinema</h1>
+  <div class="actions">
+    <button id="watch" type="button" disabled>开始观影</button>
+    <button id="display-mode" type="button" hidden>全屏</button>
+  </div>
+  <time id="last-submitted" aria-live="polite" hidden></time>
+  <p id="watch-status" role="status" hidden></p>
+  <p id="display-status" role="status" hidden></p>
+  <section id="aiActivityPanel" aria-labelledby="aiActivityTitle" hidden>
+    <header class="activity-header">
+      <h2 id="aiActivityTitle">AI 连接</h2>
+      <p id="aiActivityStats" aria-live="polite"></p>
+    </header>
+    <div class="activity-cinema"><span>影院当前进度</span><span id="aiActivityFilm"></span><time id="aiActivityTime"></time></div>
+    <div class="activity-scroll" aria-label="连接及工具调用记录">
+      <p id="aiActivityNotice" class="activity-notice" role="status">正在读取连接状态…</p>
+      <div id="aiActivityConnections"></div>
+    </div>
+  </section>
+</main>
+<script>
+  const controlTool = 'cinema_card_control';
+  const cardMeta = 'open-watch-cinema/cardId';
+  const stateMeta = 'open-watch-cinema/state';
+  const packetMeta = 'open-watch-cinema/packet';
+  const activityMeta = 'open-watch-cinema/activity';
+  const expiredBatch = new Set([
+    'The cinema batch is no longer available.',
+    'The cinema batch changed before submission.',
+    'The cinema batch expired before submission.'
+  ]);
+  const cardErrors = {
+    'This ChatGPT card is no longer active.': '这张卡片的连接已结束。请在当前对话里重新打开 Open Watch Cinema。',
+    'This ChatGPT card was replaced.': '当前对话已换用另一张影院卡片。请使用后来打开的卡片。',
+    'Enable ChatGPT continuous viewing in the local cinema first.': '请先在影院设置中启用 ChatGPT 跟片。',
+    'Stop the Listener in the active ChatGPT conversation first.': '请在正在跟片的 ChatGPT 对话里点「停止跟片」，再回这里开始。'
+  };
+  const button = document.querySelector('#watch');
+  const displayButton = document.querySelector('#display-mode');
+  const displayStatus = document.querySelector('#display-status');
+  const time = document.querySelector('#last-submitted');
+  const notice = document.querySelector('#watch-status');
+  const pending = new Map();
+  let nextId = 0;
+  let hostOrigin = '*';
+  let cardId;
+  let active = false;
+  let changing = false;
+  let closed = false;
+  let displayMode = 'inline';
+  let availableDisplayModes = [];
+  let displayRequest = false;
+  let displayRevision = 0;
+  let hostModalities;
+  let openAiMessaging = false;
+  let lastSubmittedSeconds = null;
+  let submissionIssue;
+  let epoch = 0;
+  let timer;
+  let polling = false;
+  let checkingStatus = false;
+  let statusRequested = false;
+  let stopRequested = false;
+  let activity;
+  let activityTimer;
+  let activityVisible = false;
+
+  function send(method, params, id) {
+    window.parent.postMessage({
+      jsonrpc: '2.0', method, params, ...(id === undefined ? {} : { id })
+    }, hostOrigin);
+  }
+
+  function request(method, params, timeout = 20_000) {
+    const id = ++nextId;
+    return new Promise((resolve, reject) => {
+      const alarm = setTimeout(() => {
+        pending.delete(id);
+        const error = new Error(method === 'ui/message'
+          ? 'ChatGPT 未确认收到这一段影片。请查看当前对话，再决定是否重新开始跟片。'
+          : method === 'tools/call' ? '卡片暂未收到影院回应。' : '卡片未收到 ChatGPT 的回应。请重新打开卡片。');
+        if (method === 'tools/call') error.code = 'CARD_TOOL_TIMEOUT';
+        reject(error);
+      }, timeout);
+      pending.set(id, { resolve, reject, alarm });
+      send(method, params, id);
+    });
+  }
+
+  function render() {
+    button.disabled = !cardId || changing || closed;
+    button.textContent = active ? '停止跟片' : '开始观影';
+  }
+
+  function formatPosition(ms) {
+    const total = Math.floor(ms / 1000);
+    const parts = [Math.floor(total / 60) % 60, total % 60];
+    if (total >= 3600) parts.unshift(Math.floor(total / 3600));
+    return parts.map(value => String(value).padStart(2, '0')).join(':');
+  }
+
+  async function readActivity(path) {
+    const url = new URL(path, 'https://cinema.invalid');
+    const [, , , , connection, , call] = url.pathname.split('/');
+    if (call) {
+      return control('activity_call', { connectionId: decodeURIComponent(connection), callId: decodeURIComponent(call) });
+    }
+    if (connection) {
+      return control('activity_calls', {
+        connectionId: decodeURIComponent(connection),
+        offset: Number(url.searchParams.get('offset')),
+        limit: Number(url.searchParams.get('limit'))
+      });
+    }
+    return control('activity');
+  }
+
+  async function readActivityImage(connectionId, callId, index) {
+    const image = await control('activity_image', { connectionId, callId, index });
+    if (image?.type !== 'image' || !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(image.mimeType) ||
+        typeof image.data !== 'string' || !image.data) {
+      throw new Error('图片不可用。');
+    }
+    return 'data:' + image.mimeType + ';base64,' + image.data;
+  }
+
+  function syncActivityView() {
+    if (!activity) return;
+    const visible = displayMode === 'fullscreen' && Boolean(cardId) && !closed;
+    if (visible === activityVisible) return;
+    activityVisible = visible;
+    activity.setVisible(visible);
+    clearInterval(activityTimer);
+    if (visible) activityTimer = setInterval(activity.notify, 5000);
+  }
+
+  window.addEventListener('cinema-activity-ready', () => {
+    activity = window.createCinemaAiActivity({
+      embedded: true,
+      fetchJson: readActivity,
+      fetchImage: readActivityImage,
+      formatTime: formatPosition
+    });
+    syncActivityView();
+  });
+
+  function displayTarget() {
+    return displayMode === 'fullscreen' ? 'inline' : 'fullscreen';
+  }
+
+  function renderDisplayMode() {
+    document.documentElement.dataset.displayMode = displayMode;
+    displayButton.hidden = !availableDisplayModes.includes(displayTarget());
+    displayButton.disabled = closed || displayRequest;
+    displayButton.textContent = displayMode === 'fullscreen' ? '退出全屏' : '全屏';
+    syncActivityView();
+  }
+
+  function applyHostContext(context) {
+    if (context?.availableDisplayModes) availableDisplayModes = context.availableDisplayModes;
+    if (context?.displayMode) {
+      displayMode = context.displayMode;
+      displayRevision++;
+    }
+    renderDisplayMode();
+  }
+
+  displayButton.addEventListener('click', async () => {
+    const target = displayTarget();
+    if (closed || displayRequest || !availableDisplayModes.includes(target)) return;
+    const revision = displayRevision;
+    displayRequest = true;
+    displayStatus.hidden = true;
+    renderDisplayMode();
+    try {
+      const result = await request('ui/request-display-mode', { mode: target }, 5_000);
+      if (closed) return;
+      if (displayRevision === revision && result?.mode) applyHostContext({ displayMode: result.mode });
+      if (displayMode !== target) throw new Error();
+    } catch {
+      if (!closed) {
+        displayStatus.textContent = '当前界面未切换显示模式，请使用 ChatGPT 的卡片显示控件。';
+        displayStatus.hidden = false;
+      }
+    } finally {
+      displayRequest = false;
+      renderDisplayMode();
+    }
+  });
+
+  function showError(message) {
+    notice.textContent = cardErrors[message] || message || '跟片中断。请检查影院连接后重新开始。';
+    notice.hidden = false;
+  }
+
+  function showTime(seconds) {
+    if (seconds === null) {
+      time.textContent = '';
+      time.hidden = true;
+      lastSubmittedSeconds = null;
+      return;
+    }
+    if (!Number.isFinite(seconds) || seconds < 0 || seconds === lastSubmittedSeconds) return;
+    time.textContent = '最近提交 · 影片 ' + formatPosition(seconds * 1000);
+    time.hidden = false;
+    lastSubmittedSeconds = seconds;
+  }
+
+  function apply(state) {
+    showTime(state.lastSubmittedSeconds);
+    active = state.started === true;
+    if (state.status === 'disabled') showError('请在影院设置中启用 ChatGPT 跟片。');
+    else if (state.reason) showError(state.reason);
+    else if (stopRequested && active) showError('影院尚未确认停止。请再点一次「停止跟片」。');
+    else if (submissionIssue) showError(submissionIssue);
+    else notice.hidden = true;
+    render();
+  }
+
+  function fromOpenResult(result) {
+    if (closed || cardId || !result) return;
+    if (result.isError) {
+      showError(result.content?.find(block => block.type === 'text')?.text);
+      return;
+    }
+    cardId = result._meta?.[cardMeta];
+    if (!cardId) return;
+    notice.hidden = true;
+    apply(result._meta?.[stateMeta] || {});
+    syncActivityView();
+    void poll(epoch);
+  }
+
+  window.addEventListener('message', event => {
+    if (event.source !== window.parent || (hostOrigin !== '*' && event.origin !== hostOrigin)) return;
+    const message = event.data;
+    if (!message || message.jsonrpc !== '2.0') return;
+    const call = pending.get(message.id);
+    if (call && (Object.hasOwn(message, 'result') || message.error)) {
+      clearTimeout(call.alarm);
+      pending.delete(message.id);
+      if (hostOrigin === '*' && event.origin !== 'null') hostOrigin = event.origin;
+      if (message.error) call.reject(new Error(message.error.message));
+      else call.resolve(message.result);
+      return;
+    }
+    if (message.method === 'ui/notifications/tool-result') fromOpenResult(message.params);
+    if (message.method === 'ui/notifications/host-context-changed') applyHostContext(message.params);
+    if (message.method === 'ui/notifications/tool-cancelled' && !cardId) {
+      showError('卡片未打开。请在当前对话中重新打开 Open Watch Cinema。');
+    }
+    if (message.method === 'ui/resource-teardown') {
+      closed = true;
+      syncActivityView();
+      cancelPoll();
+      cardSize.disconnect();
+      if (active && cardId) void control('stop').catch(() => {});
+      window.parent.postMessage({ jsonrpc: '2.0', id: message.id, result: {} }, hostOrigin);
+    }
+  });
+
+  function cancelPoll() {
+    epoch++;
+    clearTimeout(timer);
+    timer = undefined;
+    statusRequested = false;
+  }
+
+  function refreshStatus() {
+    if (!cardId || closed || changing || checkingStatus || document.visibilityState === 'hidden') return;
+    statusRequested = true;
+    if (polling) return;
+    clearTimeout(timer);
+    timer = undefined;
+    void poll(epoch);
+  }
+
+  document.addEventListener('visibilitychange', refreshStatus);
+  window.addEventListener('focus', refreshStatus);
+
+  async function control(action, ids = {}) {
+    const result = await request('tools/call', { name: controlTool, arguments: { action, cardId, ...ids } });
+    if (result?.isError) {
+      const message = result.content?.find(block => block.type === 'text')?.text;
+      if (action !== 'activity' && (message === 'This ChatGPT card is no longer active.' ||
+          message === 'This ChatGPT card was replaced.' || message?.startsWith('无法连接本机影院。'))) {
+        activity?.clear();
+      }
+      throw new Error(message);
+    }
+    if (action === 'activity' || action.startsWith('activity_')) {
+      const record = result?._meta?.[activityMeta];
+      if (!record) throw new Error('暂时无法读取影院连接记录。');
+      return record;
+    }
+    const state = result?._meta?.[stateMeta];
+    if (!state || typeof state !== 'object') {
+      throw new Error('ChatGPT 未返回卡片状态。请在当前对话里重新打开 Open Watch Cinema。');
+    }
+    return action === 'poll' && ids.claimId ? { state, packet: result._meta[packetMeta] } : state;
+  }
+
+  async function submit(ids, current, result) {
+    let attempted = false;
+    let definitive = false;
+    try {
+      const content = result?.content;
+      if (result?.isError || !Array.isArray(content) || !content.length ||
+          content.some(block => block.type !== 'text' && block.type !== 'image')) {
+        throw new Error('影院未返回完整的图文资料。请检查影院后重新开始。');
+      }
+      if (!openAiMessaging && hostModalities && Object.keys(hostModalities).length &&
+          content.some(block => !Object.hasOwn(hostModalities, block.type))) {
+        throw new Error('当前 ChatGPT 界面不支持提交这一段的完整图文。请换到支持图文提交的界面，再打开卡片。');
+      }
+      attempted = true;
+      const accepted = await request('ui/message', {
+        role: 'user', content
+      }, 40_000);
+      definitive = accepted?.isError === true;
+      if (!accepted || accepted.isError) {
+        throw new Error('ChatGPT 未接收这一段图文。请查看当前对话是否有提交确认，再重新开始跟片。');
+      }
+    } catch (error) {
+      await control(attempted ? 'failed' : 'abandon', definitive ? { ...ids, definitive } : ids).catch(() => {});
+      if (current === epoch && (definitive || (!attempted && result))) submissionIssue = error.message;
+      throw error;
+    }
+    if (!closed && current === epoch) showTime(result._meta?.['open-watch-cinema/filmSeconds']);
+    const state = await control('submitted', ids);
+    if (current === epoch && !closed) apply(state);
+  }
+
+  function schedule(current) {
+    if (!active || stopRequested || closed || current !== epoch || timer !== undefined) return;
+    timer = setTimeout(() => {
+      timer = undefined;
+      void poll(current);
+    }, 500);
+  }
+
+  async function claimFromPoll(current) {
+    const claimId = Array.from(crypto.getRandomValues(new Uint8Array(16)),
+      byte => byte.toString(16).padStart(2, '0')).join('');
+    // Both IDs are known before the request so a lost reply can be cleaned up
+    // exactly while this card still knows it never attempted ui/message.
+    const ids = { batchId: claimId, claimId };
+    let reply;
+    try {
+      reply = await control('poll', { claimId });
+    } catch (error) {
+      if (!expiredBatch.has(error.message)) await control('abandon', ids).catch(() => {});
+      throw error;
+    }
+    const stale = closed || current !== epoch;
+    if (!stale) apply(reply.state);
+    if (!reply.packet) return;
+    if (stale || !active) {
+      await control('abandon', ids).catch(() => {});
+      return;
+    }
+    await submit(ids, current, reply.packet);
+  }
+
+  async function poll(current) {
+    if (polling || changing || closed || current !== epoch) return;
+    const shouldClaim = active && !stopRequested && !submissionIssue && !statusRequested;
+    statusRequested = false;
+    polling = true;
+    checkingStatus = !shouldClaim;
+    try {
+      if (shouldClaim) {
+        await claimFromPoll(current);
+      } else {
+        const state = await control('poll');
+        if (!closed && current === epoch) apply(state);
+      }
+    } catch (error) {
+      if (!closed && current === epoch && !expiredBatch.has(error.message)) {
+        showError(error.code === 'CARD_TOOL_TIMEOUT' && active && !stopRequested
+          ? '卡片暂未收到影院回应，会再次查询。'
+          : error.message);
+      }
+    } finally {
+      polling = false;
+      checkingStatus = false;
+      if (!closed && !changing) {
+        if (statusRequested && document.visibilityState !== 'hidden') refreshStatus();
+        else schedule(epoch);
+      }
+    }
+  }
+
+  button.addEventListener('click', async () => {
+    if (changing || closed || !cardId) return;
+    const action = active ? 'stop' : 'start';
+    cancelPoll();
+    stopRequested = action === 'stop';
+    const current = epoch;
+    changing = true;
+    submissionIssue = null;
+    notice.hidden = true;
+    render();
+    try {
+      const state = await control(action);
+      if (!closed && current === epoch) apply(state);
+    } catch (error) {
+      if (!closed && current === epoch) showError(error.message);
+    } finally {
+      changing = false;
+      render();
+      schedule(current);
+    }
+  });
+
+  const cardSize = new ResizeObserver(() => {
+    if (displayMode !== 'inline') return;
+    send('ui/notifications/size-changed', {
+      width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight
+    });
+  });
+  request('ui/initialize', {
+    appInfo: { name: 'Open Watch Cinema', version: '1.0.0' },
+    appCapabilities: { availableDisplayModes: ['inline', 'fullscreen'] },
+    protocolVersion: '2026-01-26'
+  }).then(result => {
+    hostModalities = result?.hostCapabilities?.message;
+    applyHostContext(result?.hostContext);
+    openAiMessaging = Object.hasOwn(result?.hostCapabilities?.experimental || {}, 'openai/message');
+    send('ui/notifications/initialized');
+    cardSize.observe(document.querySelector('main'));
+    const metadata = window.openai?.toolResponseMetadata;
+    fromOpenResult(metadata?.mcp_tool_result || metadata?.call_tool_result);
+    setTimeout(() => {
+      if (!cardId && notice.hidden && !closed) {
+        showError('卡片未收到当前对话的连接身份。请在当前对话里重新打开 Open Watch Cinema。');
+      }
+    }, 10_000);
+  }).catch(error => showError(error.message));
+</script>
+<script type="module" data-activity></script>
+</body>
+</html>
