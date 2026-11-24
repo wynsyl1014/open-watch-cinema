@@ -56,7 +56,7 @@ export function parseWebVtt(text) {
 }
 
 function cueSettings() {
-  return 'line:96%,end position:50%,center size:96% align:center';
+  return 'line:-1 position:50% size:96% align:center';
 }
 
 function buildWebVtt(cues, { bilingual = false } = {}) {

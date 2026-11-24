@@ -1,0 +1,6 @@
+conette==0.4.0
+numpy==1.26.4
+torchmetrics==1.2.1
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
+# The SciPy 1.15.3 arm64 wheel fails dyld validation on macOS 27.
+scipy==1.13.1 ; sys_platform == "darwin" and platform_machine == "arm64"

@@ -6,17 +6,16 @@
   "description": "A Windows and macOS local cinema with safe media preparation, AI viewing packages, and time-bound watch rooms.",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test tests/*.test.mjs",
-    "check": "node --check server.mjs && node --check src/cinema-tick.mjs && node --check src/database.mjs && node --check src/media-library.mjs && node --check src/media-compatibility.mjs && node --check src/media-subtitles.mjs && node --check src/dialogue-track.mjs && node --check src/http-range.mjs && node --check src/observation-manager.mjs && node --check src/observation-precompute-plan.mjs && node --check src/observation-precompute-runner.mjs && node --check src/observation-track-reader.mjs && node --check src/storyboard-frame.mjs && node --check scripts/precompute-observations.mjs && node --check scripts/probe-subtitles.mjs && node --check scripts/extract-subtitles.mjs && node --check scripts/read-observation-window.mjs && node --check scripts/inspect-observation-package.mjs && node --check scripts/verify-observation-package.mjs && node --check scripts/ai-pipeline-smoke.mjs && node --check scripts/mcp-smoke.mjs && node --check scripts/live-tick-smoke.mjs && node --check scripts/frame-http-smoke.mjs && node --check mcp/server.mjs && node --check public/subtitle-utils.js && node --check public/app.js",
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "check": "node --check server.mjs && node --check src/delivery/cinema-tick.mjs && node --check src/storage/database.mjs && node --check src/media/media-library.mjs && node --check src/media/media-compatibility.mjs && node --check src/media/media-subtitles.mjs && node --check src/preparation/dialogue-track.mjs && node --check src/media/http-range.mjs && node --check src/preparation/observation-manager.mjs && node --check src/preparation/observation-precompute-plan.mjs && node --check src/preparation/observation-precompute-runner.mjs && node --check src/delivery/observation-track-reader.mjs && node --check src/visuals/storyboard-frame.mjs && node --check scripts/preparation/precompute-observations.mjs && node --check scripts/media/probe-subtitles.mjs && node --check scripts/media/extract-subtitles.mjs && node --check scripts/delivery/read-observation-window.mjs && node --check scripts/delivery/inspect-observation-package.mjs && node --check scripts/delivery/verify-observation-package.mjs && node --check scripts/preparation/ai-pipeline-smoke.mjs && node --check scripts/mcp/mcp-smoke.mjs && node --check mcp/server.mjs && node --check mcp/runtime/configuration.mjs && node --check mcp/runtime/validation.mjs && node --check mcp/runtime/results.mjs && node --check mcp/runtime/cinema-client.mjs && node --check mcp/viewing/viewing-session.mjs && node --check mcp/viewing/viewing-guidance.mjs && node --check mcp/runtime/protocol.mjs && node --check mcp/tools/index.mjs && node --check mcp/tools/viewing.mjs && node --check mcp/tools/preparation.mjs && node --check mcp/viewing/catchup-feed.mjs && node --check mcp/viewing/viewing-feed.mjs && node --check scripts/visuals/cadence-http-smoke.mjs && node --check src/visuals/viewing-cadence.mjs && node --check public/subtitle-utils.js && node --check public/app.js && node --check public/cleanup-dialog.js && node --check public/skip-settings.js && node --check public/playback-skip.js && node --check mcp/tools/action-group.mjs && node --check mcp/tools/control.mjs && node --check mcp/tools/management.mjs && node --check mcp/tools/active-room.mjs && node --check mcp/tools/history.mjs && node --check mcp/tools/room-actions.mjs && node --check src/media/index.mjs && node --check src/preparation/package-upgrade.mjs && node --check src/preparation/index.mjs && node --check src/delivery/index.mjs && node --check src/visuals/index.mjs && node --check src/storage/index.mjs",
     "observer:health": "python observer/worker.py health",
-    "observer:precompute": "node scripts/precompute-observations.mjs",
-    "smoke": "node scripts/smoke.mjs",
-    "smoke:room": "node scripts/room-http-smoke.mjs",
-    "smoke:ai": "node scripts/ai-pipeline-smoke.mjs",
-    "smoke:tick": "node scripts/live-tick-smoke.mjs",
-    "smoke:frame": "node scripts/frame-http-smoke.mjs",
+    "observer:precompute": "node scripts/preparation/precompute-observations.mjs",
+    "smoke": "node scripts/ui/smoke.mjs",
+    "smoke:room": "node scripts/rooms/room-http-smoke.mjs",
+    "smoke:ai": "node scripts/preparation/ai-pipeline-smoke.mjs",
     "mcp": "node mcp/server.mjs",
-    "smoke:mcp": "node scripts/mcp-smoke.mjs"
+    "smoke:mcp": "node scripts/mcp/mcp-smoke.mjs",
+    "smoke:cadence": "node scripts/visuals/cadence-http-smoke.mjs"
   },
   "engines": {
     "node": ">=24.0.0"

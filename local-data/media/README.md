@@ -1,7 +1,3 @@
-# Put your videos here
+# 影片目录
 
-Copy video files you are allowed to play into this folder, then start the cinema or press **Rescan** on the page.
-
-Supported in the first playable build: `.mp4`, `.m4v`, `.webm`, `.mov`, `.mkv`.
-
-The repository keeps this instruction file so the folder exists after cloning. Actual videos are ignored by Git and remain on your computer.
+把影片放进这里，启动影院，或在片库点「重新扫描」。影片保存在本机，格式、字幕和整理方法见[观影指南](../../docs/观影须知/观影指南.md)。

@@ -1,17 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>Open Watch Cinema</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/notebook.css">
+  <link rel="stylesheet" href="/ai-activity.css">
 </head>
 <body>
   <main class="cinema-page">
     <section class="cinema-heading" aria-labelledby="cinemaTitle">
-      <p class="eyebrow">OPEN WATCH CINEMA</p>
+      <p class="eyebrow" lang="en">OPEN WATCH CINEMA</p>
       <p class="cinema-whisper" id="cinemaTitle">Let the room disappear. Keep the story.</p>
+      <div class="heading-ornament" aria-hidden="true"><span class="heading-star">✦</span></div>
     </section>
 
     <section class="cinema-workspace" id="cinemaWorkspace" aria-live="polite">
@@ -20,97 +23,288 @@
           <div class="screen-frame" id="screenFrame">
             <video id="videoPlayer" controls preload="metadata" playsinline></video>
             <div class="danmaku-layer" id="danmakuLayer" aria-hidden="true"></div>
+            <div class="interaction-layer screen-interaction-layer" id="screenInteractionLayer" aria-hidden="true"></div>
             <div class="screen-placeholder" id="screenPlaceholder">
               <span class="placeholder-icon" aria-hidden="true">▶</span>
-              <strong>The screen is waiting</strong>
-              <small>Choose a film from the strip below.</small>
+              <strong lang="en">The screen is waiting</strong>
+              <small lang="en">Choose a film from the strip below.</small>
             </div>
 
             <div class="screen-actions" id="screenActions">
-              <button class="screen-action-button sidebar-toggle-button" id="sidebarHandle" type="button" aria-expanded="false" aria-controls="roomSidebar" title="Open room sidebar">
+              <button class="screen-action-button sidebar-toggle-button" id="sidebarHandle" type="button" aria-expanded="false" aria-controls="roomSidebar" title="打开房间侧栏" aria-label="打开房间侧栏">
                 <span aria-hidden="true">◀</span>
                 <b id="unreadBadge" hidden>0</b>
               </button>
-              <button class="screen-action-button fullscreen-button" id="fullscreenButton" type="button" title="Cinema full screen" aria-label="Cinema full screen">
+              <button class="screen-action-button viewing-settings-button" id="viewingSettingsButton" type="button" title="影院设置" aria-label="影院设置" aria-haspopup="dialog" aria-controls="viewingSettingsDialog">
+                <span aria-hidden="true">⚙</span>
+              </button>
+              <button class="screen-action-button fullscreen-button" id="fullscreenButton" type="button" title="影院全屏" aria-label="影院全屏">
                 <span aria-hidden="true">⛶</span>
               </button>
             </div>
           </div>
 
           <div class="danmaku-dock" id="danmakuDock">
-            <button class="danmaku-toggle" id="danmakuToggle" type="button" aria-pressed="true">
-              Danmaku on
-            </button>
-            <div class="subtitle-picker" id="subtitlePicker">
-              <label for="subtitleSelect">CC</label>
-              <select id="subtitleSelect" aria-label="Subtitle track" disabled>
-                <option value="off">Subtitles off</option>
+            <div class="dock-group dock-toggles">
+              <button class="danmaku-toggle icon-tool-button tip-left" id="interactionToggle" type="button" aria-pressed="false" aria-label="互动已关闭（点击开启零食与碰杯互动）" data-tip="互动已关闭">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M10.5 3.6c.4 3.5 1.7 4.8 5.2 5.2-3.5.4-4.8 1.7-5.2 5.2-.4-3.5-1.7-4.8-5.2-5.2 3.5-.4 4.8-1.7 5.2-5.2Z"/>
+                  <path d="M17.8 13.4c.22 1.65.83 2.26 2.48 2.48-1.65.22-2.26.83-2.48 2.48-.22-1.65-.83-2.26-2.48-2.48 1.65-.22 2.26-.83 2.48-2.48Z"/>
+                  <path class="icon-slash" d="M4.2 19.8 19.8 4.2"/>
+                </svg>
+              </button>
+              <button class="danmaku-toggle icon-tool-button" id="danmakuToggle" type="button" aria-pressed="true" aria-label="弹幕已开启（点击关闭）" data-tip="弹幕已开启">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="14" rx="3.2"/>
+                  <path d="M7 9.6h7.2M9.8 14.4H17"/>
+                  <path class="icon-slash" d="M4.2 19.8 19.8 4.2"/>
+                </svg>
+              </button>
+            </div>
+            <div class="dock-group subtitle-picker" id="subtitlePicker">
+              <label class="cc-icon-label" for="subtitleSelect" aria-label="屏幕字幕" data-tip="屏幕字幕">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="2.8" y="5.2" width="18.4" height="13.6" rx="3"/>
+                  <path d="M10.4 9.7a2.6 2.6 0 1 0 0 4.6M16.9 9.7a2.6 2.6 0 1 0 0 4.6"/>
+                </svg>
+              </label>
+              <select id="subtitleSelect" aria-label="字幕轨道" disabled>
+                <option value="off">字幕关闭</option>
               </select>
-              <button id="addSubtitleButton" type="button" title="Add a local SRT or VTT subtitle">＋ SRT/VTT</button>
+              <button class="icon-tool-button" id="subtitleSizeButton" type="button" popovertarget="subtitleSizePanel" aria-label="调整字幕字号" data-tip="字幕字号">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3.8 17.5 8.1 6.8l4.3 10.7M5.2 14.2h5.8"/>
+                  <path d="M15.4 13.6a2.3 2.3 0 1 1 4.4.9v3M19.8 15.2h-2.1a1.75 1.75 0 0 0 0 3.5c1.1 0 2.1-.6 2.1-1.6"/>
+                </svg>
+              </button>
+              <div id="subtitleSizePanel" popover role="group" aria-label="调整字幕字号" lang="zh-CN">
+                <div class="subtitle-size-steps">
+                  <button id="subtitleSmaller" type="button" aria-label="缩小字幕">−</button>
+                  <output id="subtitleScale" aria-live="polite">100%</output>
+                  <button id="subtitleLarger" type="button" aria-label="放大字幕">＋</button>
+                </div>
+                <button id="subtitleSizeAuto" type="button">恢复自动</button>
+              </div>
+              <button class="icon-tool-button" id="addSubtitleButton" type="button" aria-label="添加本地 SRT 或 VTT 字幕" data-tip="添加本地字幕">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M13.5 3.5H7.2a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h4.6"/>
+                  <path d="M13.5 3.5 18.8 8.8v3.1M13.5 3.5v5.3h5.3"/>
+                  <path d="M8.5 12.6h4.2M8.5 15.8h2.6"/>
+                  <path d="M17.2 14.5v5.6M14.4 17.3H20"/>
+                </svg>
+              </button>
               <input id="subtitleFileInput" type="file" accept=".srt,.vtt,text/vtt,application/x-subrip" hidden>
             </div>
             <form class="quick-composer" id="quickComposer" hidden>
-              <input id="quickMessageInput" type="text" maxlength="800" autocomplete="off" placeholder="Say it at this frame…">
-              <button type="submit">Send</button>
+              <div class="quick-message-field">
+                <div class="quick-input-shell">
+                  <button class="icon-tool-button interaction-menu-trigger tip-left" id="quickInteractionTrigger" type="button" popovertarget="interactionPopover" aria-haspopup="true" aria-expanded="false" aria-controls="interactionPopover" aria-label="打开观影互动" data-tip="观影互动" hidden>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="3.8" y="8.5" width="16.4" height="3.8" rx="1.1"/>
+                      <path d="M5.4 12.3v6.4a1.8 1.8 0 0 0 1.8 1.8h9.6a1.8 1.8 0 0 0 1.8-1.8v-6.4"/>
+                      <path d="M12 8.5v12"/>
+                      <path d="M12 8.5H8.6a2.1 2.1 0 1 1 0-4.2c2.1 0 3.4 4.2 3.4 4.2Z"/>
+                      <path d="M12 8.5h3.4a2.1 2.1 0 1 0 0-4.2c-2.1 0-3.4 4.2-3.4 4.2Z"/>
+                    </svg>
+                  </button>
+                  <button class="icon-tool-button quick-message-trigger tip-left" id="quickMessageTrigger" type="button" popovertarget="quickMessagePopover" aria-haspopup="true" aria-expanded="false" aria-controls="quickMessagePopover" aria-label="插入快捷消息" data-tip="快捷消息">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M12 5.5v13M5.5 12h13"/>
+                    </svg>
+                  </button>
+                  <input id="quickMessageInput" type="text" maxlength="800" autocomplete="off" aria-label="房间消息" placeholder="说点什么…">
+                </div>
+                <button type="submit">发送</button>
+              </div>
             </form>
-            <span class="dock-note" id="dockNote">Open the room when the story asks for company.</span>
+            <button class="room-button danger end-room-button" id="endRoomButton" type="button" hidden title="结束本次观影房间，保留聊天记录">结束房间</button>
+            <span class="dock-note" id="dockNote">需要陪伴时，再开启房间。</span>
           </div>
         </div>
       </section>
 
-      <aside class="room-sidebar" id="roomSidebar" aria-label="Room conversation and past sessions">
+      <aside class="room-sidebar" id="roomSidebar" aria-label="房间消息与往期放映">
         <header class="sidebar-header">
           <div>
-            <p class="eyebrow">THE ROOM BESIDE THE SCREEN</p>
-            <h2 id="sidebarTitle">Room messages</h2>
+            <p class="eyebrow" lang="en">THE ROOM BESIDE THE SCREEN</p>
+            <h2 id="sidebarTitle">房间消息</h2>
           </div>
-          <button class="icon-button" id="closeSidebarButton" type="button" aria-label="Close sidebar">×</button>
+          <button class="icon-button" id="closeSidebarButton" type="button" aria-label="关闭侧栏">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
+              <path d="M3.75 3.75 12.25 12.25M12.25 3.75 3.75 12.25"/>
+            </svg>
+          </button>
         </header>
 
-        <div class="sidebar-tabs" role="tablist" aria-label="Room sidebar views">
-          <button class="sidebar-tab active" id="messagesTab" type="button" role="tab" aria-selected="true">Messages</button>
-          <button class="sidebar-tab" id="sessionsTab" type="button" role="tab" aria-selected="false">Past sessions</button>
+        <div class="sidebar-tabs" role="tablist" aria-label="侧栏视图">
+          <button class="sidebar-tab active" id="messagesTab" type="button" role="tab" aria-selected="true">消息</button>
+          <button class="sidebar-tab" id="sessionsTab" type="button" role="tab" aria-selected="false">往期放映</button>
+        </div>
+
+        <div class="room-drawer" id="roomSummaryBox" data-state="idle">
+          <div class="room-drawer-body" id="roomDrawerBody" aria-hidden="true" inert>
+            <div class="room-drawer-inner">
+              <div class="room-drawer-row">
+                <div class="room-drawer-identity">
+                  <span class="room-drawer-label">我的名字</span>
+                  <button class="identity-link" id="identitySettings" type="button" aria-controls="viewingSettingsDialog" aria-haspopup="dialog" title="修改我的名字">
+                    <strong id="currentNameLabel">user</strong>
+                  </button>
+                </div>
+                <button type="button" class="room-button export-room-button" id="roomExportButton" aria-haspopup="dialog" hidden>导出这次放映</button>
+                <span class="room-drawer-muted" id="roomExportHint">开启房间后可导出</span>
+              </div>
+              <div class="room-drawer-extra" id="roomSummary" hidden></div>
+              <div class="room-summary-line" aria-hidden="true"></div>
+            </div>
+          </div>
+          <button type="button" class="room-drawer-handle" id="roomDrawerHandle" aria-expanded="false" aria-controls="roomDrawerBody" aria-label="下拉展开房间选项" title="拉下房间选项（名字与导出）">
+            <span class="room-drawer-pill" aria-hidden="true"></span>
+          </button>
         </div>
 
         <section class="sidebar-panel" id="messagesPanel" role="tabpanel">
-          <div class="room-summary" id="roomSummary">
-            <strong>No room is open.</strong>
-            <p>The screen is yours alone.</p>
-          </div>
-
-          <details class="identity-settings" id="identitySettings">
-            <summary>
-              <span>Your name</span>
-              <strong id="currentNameLabel">Viewer</strong>
-            </summary>
-            <label for="senderNameInput">Name shown in this cinema</label>
-            <input id="senderNameInput" type="text" maxlength="60" autocomplete="nickname" value="Viewer">
-          </details>
-
+          <div class="interaction-layer chat-interaction-layer" id="chatInteractionLayer" aria-hidden="true"></div>
           <div class="message-list" id="messageList"></div>
           <form class="sidebar-composer" id="sidebarComposer" hidden>
-            <textarea id="sidebarMessageInput" maxlength="800" rows="3" aria-label="Room message" placeholder="Say it at this frame…"></textarea>
-            <button type="submit">Send to room</button>
+            <div class="sidebar-compose-box">
+              <textarea id="sidebarMessageInput" maxlength="800" rows="2" aria-label="房间消息" placeholder="记下这一帧想说的话…"></textarea>
+              <div class="sidebar-compose-foot" id="sidebarComposeFoot">
+                <button class="icon-tool-button interaction-menu-trigger tip-left" id="sidebarInteractionTrigger" type="button" popovertarget="interactionPopover" aria-haspopup="true" aria-expanded="false" aria-controls="interactionPopover" aria-label="打开观影互动" data-tip="观影互动" hidden>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3.8" y="8.5" width="16.4" height="3.8" rx="1.1"/>
+                    <path d="M5.4 12.3v6.4a1.8 1.8 0 0 0 1.8 1.8h9.6a1.8 1.8 0 0 0 1.8-1.8v-6.4"/>
+                    <path d="M12 8.5v12"/>
+                    <path d="M12 8.5H8.6a2.1 2.1 0 1 1 0-4.2c2.1 0 3.4 4.2 3.4 4.2Z"/>
+                    <path d="M12 8.5h3.4a2.1 2.1 0 1 0 0-4.2c-2.1 0-3.4 4.2-3.4 4.2Z"/>
+                  </svg>
+                </button>
+                <button class="icon-tool-button quick-message-trigger tip-left" id="sidebarQuickMessageTrigger" type="button" popovertarget="quickMessagePopover" aria-haspopup="true" aria-expanded="false" aria-controls="quickMessagePopover" aria-label="插入快捷消息" data-tip="快捷消息">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 5.5v13M5.5 12h13"/>
+                  </svg>
+                </button>
+                <button type="submit">发送</button>
+              </div>
+            </div>
+            <p class="sidebar-compose-hint">⌘ / Ctrl + Enter 发送</p>
           </form>
         </section>
 
         <section class="sidebar-panel" id="sessionsPanel" role="tabpanel" hidden>
-          <p class="session-help">Every ended room keeps its words beside the frame where they were spoken.</p>
           <div class="session-list" id="sessionList"></div>
         </section>
       </aside>
 
-      <div class="now-playing-row">
-        <div>
-          <span>NOW PLAYING</span>
-          <strong id="nowPlayingTitle">Nothing selected</strong>
-          <p id="playerMessage">The curtain is waiting.</p>
+      <div class="now-playing-row" lang="zh-CN">
+        <div class="now-playing-info">
+          <div class="ticket-emblem" aria-hidden="true">
+            <svg viewBox="0 0 220 116" width="210" height="110" fill="none" stroke="url(#ticket-rose-ink)" stroke-linecap="round" stroke-linejoin="round">
+              <defs>
+                <linearGradient id="ticket-rose-ink" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#c9e4f8"/>
+                  <stop offset="52%" stop-color="#b8b0e2"/>
+                  <stop offset="100%" stop-color="#88c2d2"/>
+                </linearGradient>
+              </defs>
+              <!-- Delicate sweeping starlight arc -->
+              <path d="M22 92 C66 106, 146 98, 198 54" stroke-width="0.65" stroke-dasharray="2 4.5" opacity="0.55"/>
+              <path d="M52 20 C102 6, 166 16, 204 42" stroke-width="0.6" opacity="0.35"/>
+
+              <!-- Slender crescent moon -->
+              <path d="M164 16 C140 24, 134 55, 150 75 C163 90, 187 92, 201 80 C183 84, 164 76, 157 60 C149 43, 153 26, 164 16 Z" stroke-width="1.15" opacity="0.92"/>
+              <path d="M160 22 C145 31, 142 54, 154 70 C164 82, 182 85, 194 79" stroke-width="0.55" opacity="0.48"/>
+
+              <!-- Graceful rose stem curving toward the moon -->
+              <path d="M32 98 C64 88, 92 74, 118 53 C128 45, 136 39, 144 34" stroke-width="1.05" opacity="0.86"/>
+              <path d="M74 82 C80 71, 86 62, 95 54" stroke-width="0.8" opacity="0.72"/>
+              <path d="M104 64 C118 65, 131 62, 143 56" stroke-width="0.75" opacity="0.68"/>
+
+              <!-- Delicate rose leaves with center veins -->
+              <path d="M62 86 C56 74, 65 62, 79 60 C77 73, 70 83, 62 86 Z" stroke-width="0.85" opacity="0.78"/>
+              <path d="M63 84 C68 75, 73 68, 77 62" stroke-width="0.5" opacity="0.52"/>
+              <path d="M84 78 C92 84, 106 84, 115 76 C105 71, 93 72, 84 78 Z" stroke-width="0.85" opacity="0.76"/>
+              <path d="M86 78 C95 78, 104 78, 112 76" stroke-width="0.5" opacity="0.5"/>
+              <path d="M119 56 C126 51, 135 51, 142 56 C135 61, 126 61, 119 56 Z" stroke-width="0.75" opacity="0.68"/>
+
+              <!-- Small side rosebud -->
+              <path d="M95 54 C91 46, 94 38, 100 35 C105 39, 106 47, 100 54" stroke-width="0.85" opacity="0.8"/>
+              <path d="M96 48 C98 44, 101 41, 103 38" stroke-width="0.65" opacity="0.65"/>
+              <path d="M92 53 C95 54, 98 54, 103 52" stroke-width="0.7" opacity="0.7"/>
+
+              <!-- Main blooming fine-line frozen rose -->
+              <g transform="translate(120 42) rotate(-18)">
+                <!-- Outer petals -->
+                <path d="M-16 4 C-22 -4, -17 -16, -6 -17 C-10 -9, -9 0, -3 5" stroke-width="0.95" opacity="0.86"/>
+                <path d="M-6 -17 C2 -23, 15 -18, 17 -7 C10 -11, 2 -11, -3 -6" stroke-width="0.95" opacity="0.88"/>
+                <path d="M17 -7 C23 1, 18 14, 7 17 C11 10, 11 2, 6 -3" stroke-width="0.95" opacity="0.86"/>
+                <path d="M7 17 C-2 22, -14 17, -16 4 C-10 10, -2 11, 4 7" stroke-width="0.9" opacity="0.82"/>
+                <!-- Middle petals -->
+                <path d="M-10 -2 C-12 -10, -3 -15, 5 -11 C0 -7, -1 -1, 2 3" stroke-width="0.88" opacity="0.9"/>
+                <path d="M5 -11 C13 -8, 13 4, 6 10 C8 4, 6 -2, 1 -5" stroke-width="0.88" opacity="0.9"/>
+                <path d="M6 10 C-1 14, -11 9, -10 -2 C-6 4, -1 6, 4 4" stroke-width="0.85" opacity="0.86"/>
+                <!-- Spiral rose heart -->
+                <path d="M-4 -1 C-4 -6, 3 -7, 5 -2 C6 2, 1 5, -2 3 C-4 1, -2 -3, 1 -2 C3 -1, 2 1, 0 1" stroke-width="0.85" opacity="0.95"/>
+              </g>
+
+              <!-- Fine four-point stars & stardust -->
+              <path d="M176 28 C176.6 33.4, 178.6 35.4, 184 36 C178.6 36.6, 176.6 38.6, 176 44 C175.4 38.6, 173.4 36.6, 168 36 C173.4 35.4, 175.4 33.4, 176 28 Z" stroke-width="0.9" opacity="0.92"/>
+              <path d="M50 38 C50.35 41.2, 51.5 42.35, 54.7 42.7 C51.5 43.05, 50.35 44.2, 50 47.4 C49.65 44.2, 48.5 43.05, 45.3 42.7 C48.5 42.35, 49.65 41.2, 50 38 Z" stroke-width="0.75" opacity="0.75"/>
+              <circle cx="192" cy="52" r="1.2" fill="#c9e4f8" stroke="none" opacity="0.72"/>
+              <circle cx="80" cy="28" r="1.1" fill="#c0b6e8" stroke="none" opacity="0.62"/>
+              <circle cx="136" cy="88" r="1.1" fill="#9bcad8" stroke="none" opacity="0.65"/>
+              <circle cx="184" cy="18" r="0.9" fill="#dceefa" stroke="none" opacity="0.6"/>
+            </svg>
+          </div>
+          <div class="ticket-head">
+            <span class="ticket-label">本场放映</span>
+            <div class="ticket-details" id="nowPlayingDetails" hidden>
+              <span id="nowPlayingDuration" hidden></span>
+              <span id="nowPlayingSubtitles" hidden></span>
+            </div>
+          </div>
+          <strong id="nowPlayingTitle">尚未选片</strong>
+          <p id="playerMessage" hidden></p>
         </div>
-        <div class="room-controls">
-          <span class="room-state" id="roomState">Solo viewing</span>
-          <button class="room-button" id="openRoomButton" type="button" disabled>Open room</button>
-          <button class="room-button danger" id="endRoomButton" type="button" hidden>End room</button>
+        <div class="ticket-stub">
+          <div class="ai-buffer-summary" id="currentAiBuffer" hidden>
+            <span id="currentAiBufferLabel"></span>
+            <div class="flow-progress-track ticket-flow-track" id="currentAiBufferProgress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="currentAiBufferLabel" aria-describedby="currentAiBufferDetail">
+              <div class="flow-progress-fill" id="currentAiBufferFill"></div>
+            </div>
+            <span class="ticket-buffer-detail" id="currentAiBufferDetail" hidden></span>
+          </div>
+          <div class="room-controls">
+            <span class="room-state" id="roomState">单人观影</span>
+            <button type="button" id="aiActivityButton" aria-expanded="false" aria-controls="aiActivityPanel" aria-label="查看 AI 工具动态" data-tip="查看 AI 工具动态">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.65" aria-hidden="true">
+                <circle cx="5.5" cy="16.5" r="2.1"/>
+                <circle cx="12" cy="6.5" r="2.1"/>
+                <circle cx="18.8" cy="14" r="2.1"/>
+                <path d="M6.8 14.7 10.7 8.4M13.6 8l3.7 4.3"/>
+              </svg>
+              <span class="ai-activity-dot" aria-hidden="true"></span>
+              <span id="aiActivityPresence">— 在线</span>
+              <span id="aiActivityBadge" hidden>— 次</span>
+              <span class="ai-activity-caret" aria-hidden="true"></span>
+            </button>
+            <button class="room-button" id="openRoomButton" type="button" disabled>开启房间</button>
+          </div>
         </div>
+      </div>
+      <div id="interactionPopover" class="interaction-popover" popover role="group" aria-label="观影互动" lang="zh-CN"></div>
+      <div id="quickMessagePopover" class="interaction-popover quick-message-popover" popover role="group" aria-label="快捷消息" lang="zh-CN"></div>
+    </section>
+
+    <section id="aiActivityPanel" aria-labelledby="aiActivityTitle" lang="zh-CN" hidden>
+      <header class="activity-header">
+        <div><h2 id="aiActivityTitle">AI 连接</h2><p id="aiActivityStats"></p></div>
+        <button type="button" id="aiActivityClose">收起 <span aria-hidden="true">⌃</span></button>
+      </header>
+      <div class="activity-cinema"><span>影院当前进度</span><span id="aiActivityFilm"></span><time id="aiActivityTime"></time></div>
+      <div class="activity-scroll" id="aiActivityScroll" aria-label="连接及工具调用记录">
+        <p id="aiActivityNotice" class="activity-notice" role="status"></p>
+        <div id="aiActivityConnections"></div>
       </div>
     </section>
 
@@ -119,7 +313,7 @@
         <button class="library-title-button" id="libraryToggle" type="button" aria-expanded="true" aria-controls="libraryBody">
           <span>
             <small>TONIGHT'S FILM STRIP</small>
-            <strong id="libraryTitle">Films</strong>
+            <strong id="libraryTitle">片库</strong>
           </span>
           <i aria-hidden="true">⌃</i>
         </button>
@@ -127,71 +321,777 @@
         <div class="library-tools">
           <label class="library-search" for="librarySearch">
             <span aria-hidden="true">⌕</span>
-            <input id="librarySearch" type="search" autocomplete="off" placeholder="Search films…">
+            <input id="librarySearch" type="search" autocomplete="off" aria-label="搜索当前合集影片" placeholder="搜索当前合集…">
           </label>
-          <span class="count-badge" id="mediaCount">0 films</span>
-          <button class="quiet-button" id="rescanButton" type="button" title="Rescan films">
-            <span aria-hidden="true">↻</span>
-            Rescan
+          <span class="count-badge" id="mediaCount">0 部影片</span>
+          <button class="quiet-button icon-tool-button tip-down tip-right" id="rescanButton" type="button" aria-label="重新扫描片库" data-tip="重新扫描">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 11a8 8 0 0 0-14.2-4.8L4 8"/>
+              <path d="M4 4v4h4"/>
+              <path d="M4 13a8 8 0 0 0 14.2 4.8L20 16"/>
+              <path d="M20 20v-4h-4"/>
+            </svg>
           </button>
-          <div class="server-pill" id="serverStatus" title="Projector status">Warming…</div>
+          <div class="server-pill" id="serverStatus" title="片库状态">投影准备中…</div>
         </div>
       </div>
 
       <div class="library-body" id="libraryBody">
         <div class="library-body-inner">
+          <nav id="shelfTrail" class="shelf-tools shelf-trail" aria-label="合集路径" hidden></nav>
+          <div class="shelf-tools shelf-primary-tools">
+            <button type="button" id="createFolder" class="icon-tool-button tip-down tip-left" aria-label="新建合集" data-tip="新建合集">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3.5 7.2a2 2 0 0 1 2-2h4.2l2 2.2h6.8a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/>
+                <path d="M12 11v5M9.5 13.5h5"/>
+              </svg>
+            </button>
+            <button type="button" id="importFiles" class="icon-tool-button tip-down" aria-label="导入影片" data-tip="导入影片">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 15.2V4.5"/>
+                <path d="m7.8 8.7 4.2-4.2 4.2 4.2"/>
+                <path d="M4.5 15.5v2.4a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.4"/>
+              </svg>
+            </button>
+            <input type="file" id="shelfFiles" accept=".mp4,.m4v,.webm,.mov,.mkv" multiple hidden>
+            <button type="button" id="shelfCollectionSettings" aria-haspopup="dialog" aria-controls="collectionSkipSettingsDialog" hidden>默认跳过片头片尾</button>
+            <button type="button" id="toggleOrganize" class="shelf-organize-toggle icon-tool-button tip-down tip-right" aria-pressed="false" aria-label="整理影片（多选、重命名和影片设置）" data-tip="整理影片">
+              <svg class="icon-organize-idle" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="4" y="5" width="4.4" height="4.4" rx="1"/>
+                <path d="M11.6 7.2H20"/>
+                <rect x="4" y="14.2" width="4.4" height="4.4" rx="1"/>
+                <path d="M11.6 16.4H20"/>
+              </svg>
+              <svg class="icon-organize-active" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m5 12.8 4.6 4.6L19.2 7.2"/>
+              </svg>
+            </button>
+          </div>
+          <div class="shelf-tools shelf-selection" id="shelfSelectionBar" role="group" aria-label="选择影片" hidden>
+            <label for="selectShelf"><input id="selectShelf" type="checkbox">全选</label>
+            <span id="selectionCount" role="status"></span>
+            <button type="button" id="clearShelf">清空选择</button>
+            <button type="button" id="moveShelf">移入合集</button>
+          </div>
+          <p id="shelfStatus" role="status" hidden></p>
+          <div id="shelfIssues"></div>
+          <div id="shelfFolders" aria-label="子合集"></div>
+          <div id="retainedFilms" aria-label="原片已移除的资料"></div>
           <div class="empty-state" id="emptyState" hidden>
-            <strong>No film on the reel yet.</strong>
-            <p>Add one to the film folder, then press <b>Rescan</b>.</p>
+            <strong>这里还没有影片。</strong>
+            <p>可以在此导入影片，或将已有影片移入这个合集。</p>
           </div>
           <div class="empty-state search-empty" id="searchEmpty" hidden>
-            <strong>No matching film.</strong>
-            <p>Try another title or clear the search.</p>
+            <strong>没有找到匹配的影片。</strong>
+            <p>试试其他片名，或清空搜索。</p>
           </div>
           <div class="media-strip" id="mediaGrid"></div>
         </div>
       </div>
     </section>
 
+    <dialog id="exportDialog" class="ai-subtitle-dialog" aria-labelledby="exportTitle" aria-describedby="exportContext">
+      <div class="ai-subtitle-form">
+        <h2 id="exportTitle"></h2>
+        <p id="exportContext"></p>
+        <div class="export-formats">
+          <a id="exportHtml" download>HTML</a>
+          <a id="exportText" download>纯文本（适合 AI）</a>
+        </div>
+        <div class="ai-subtitle-actions"><button type="button" id="exportClose" class="room-button">关闭</button></div>
+      </div>
+    </dialog>
+    <dialog id="cleanupDialog" class="ai-subtitle-dialog" aria-labelledby="cleanupTitle" aria-describedby="cleanupContext">
+      <div class="ai-subtitle-form">
+        <h2 id="cleanupTitle"></h2>
+        <p id="cleanupContext"></p>
+        <label id="collectionOperationLabel">选择操作
+          <select id="collectionOperation">
+            <option value="rename">重命名合集</option>
+            <option value="dissolve">解散合集并移到上一级</option>
+            <option value="empty">删除空合集</option>
+            <option value="cleanup">批量清理</option>
+          </select>
+        </label>
+        <fieldset id="cleanupScope"><legend>选择清理范围</legend><div id="cleanupOptions"></div></fieldset>
+        <div id="cleanupDetails"></div>
+        <p id="cleanupWarnings"></p>
+        <p id="cleanupFeedback" role="status"></p>
+        <p id="cleanupError" role="alert" hidden></p>
+        <div class="ai-subtitle-actions">
+          <button id="cleanupCancel" class="room-button" type="button" autofocus>取消</button>
+          <button id="cleanupConfirm" class="room-button" type="button" disabled>确认清理所选内容</button>
+        </div>
+      </div>
+    </dialog>
+    <dialog id="recordDialog" class="ai-subtitle-dialog" aria-labelledby="recordDialogTitle" aria-describedby="recordDialogContext">
+      <div class="ai-subtitle-form">
+        <h2 id="recordDialogTitle"></h2>
+        <p id="recordDialogContext"></p>
+        <p id="recordDialogEffect" aria-live="polite"></p>
+        <p id="recordDialogError" role="alert" hidden></p>
+        <div class="ai-subtitle-actions"><button class="room-button" id="recordCancel" type="button" autofocus>取消</button><button class="room-button" id="recordConfirm" type="button" disabled>确认</button></div>
+      </div>
+    </dialog>
+    <input id="archiveRelinkFile" type="file" accept=".mp4,.m4v,.mov,.mkv,.webm" hidden>
+    <dialog id="shelfDialog" class="ai-subtitle-dialog" aria-labelledby="shelfTitle">
+      <form class="ai-subtitle-form" id="shelfForm">
+        <h2 id="shelfTitle"></h2>
+        <p id="shelfContext"></p>
+        <label id="shelfDestinationLabel">目标合集<select id="shelfDestination"></select></label>
+        <label id="shelfNameLabel"><span id="shelfNameCaption"></span><input id="shelfName" autocomplete="off"></label>
+        <p id="shelfError" role="alert" hidden></p>
+        <div class="ai-subtitle-actions"><button class="room-button" id="shelfCancel" type="button">取消</button><button class="room-button ai-subtitle-confirm" type="submit" id="shelfSubmit">确定</button></div>
+      </form>
+    </dialog>
     <dialog class="ai-subtitle-dialog playback-repair-dialog" id="playbackRepairDialog" aria-labelledby="playbackRepairDialogTitle">
       <form method="dialog" class="ai-subtitle-form playback-repair-form">
-        <p class="eyebrow">PLAYBACK REPAIR</p>
-        <h2 id="playbackRepairDialogTitle">What went wrong?</h2>
-        <p class="ai-subtitle-help">Tell the cinema what you actually observed. It will change only the smallest media layer that needs help, without guessing a browser compatibility table.</p>
+        <p class="eyebrow">播放修复</p>
+        <h2 id="playbackRepairDialogTitle">检查播放</h2>
+        <p class="ai-subtitle-help">请选择试播时遇到的情况。修复成功后，处理过的文件会替换原片。已保存的字幕文件会保留，尚未提取的内嵌字幕可能随原片替换而消失。需要保留时，请先在「影片设置」中补提。</p>
         <fieldset class="ai-subtitle-options playback-repair-options" id="playbackRepairOptions">
           <label class="ai-subtitle-option">
             <input type="radio" name="playbackRepair" value="audio">
-            <span><b>Picture works, no sound</b><small>Keep the video and container. Convert only audio.</small></span>
+            <span><b>有画面，没有声音</b><small>保留画面和原封装，将音频转换为 AAC。</small></span>
           </label>
           <label class="ai-subtitle-option">
             <input type="radio" name="playbackRepair" value="video">
-            <span><b>Sound works, no picture</b><small>Keep the audio and container. Convert only video.</small></span>
+            <span><b>有声音，没有画面</b><small>保留声音和原封装，将视频转换为 H.264。</small></span>
           </label>
           <label class="ai-subtitle-option">
             <input type="radio" name="playbackRepair" value="remux">
-            <span><b>The file will not load</b><small>Try a light MP4 rewrap first. No video or audio re-encoding.</small></span>
+            <span><b>影片无法加载</b><small>保留原有音视频轨，重新封装为 MP4。</small></span>
           </label>
           <label class="ai-subtitle-option">
             <input type="radio" name="playbackRepair" value="safe">
-            <span><b>Not sure · use the safest fallback</b><small>Use MP4 and only transcode tracks that miss the conservative H.264/AAC profile.</small></span>
+            <span><b>不确定，用通用格式修复</b><small>使用 MP4、H.264 视频和 AAC 音频，只转换需要调整的轨道。</small></span>
           </label>
         </fieldset>
         <div class="ai-subtitle-actions">
-          <button class="room-button" id="playbackRepairCancel" type="submit" value="cancel">Cancel</button>
-          <button class="room-button ai-subtitle-confirm" id="playbackRepairConfirm" type="submit" value="confirm" disabled>Start repair</button>
+          <button class="room-button" id="playbackRepairCancel" type="submit" value="cancel">取消</button>
+          <button class="room-button ai-subtitle-confirm" id="playbackRepairConfirm" type="submit" value="confirm" disabled>开始修复</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="ai-subtitle-dialog viewing-settings-dialog" id="viewingSettingsDialog" aria-labelledby="viewingSettingsTitle" lang="zh-CN">
+      <header class="cinema-settings-header">
+        <h2 id="viewingSettingsTitle">影院设置</h2>
+        <button id="viewingSettingsClose" type="button" aria-label="关闭影院设置" title="关闭"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M3.75 3.75 12.25 12.25M12.25 3.75 3.75 12.25"/></svg></button>
+      </header>
+      <nav class="cinema-settings-nav" aria-label="设置分区">
+        <button type="button" data-settings-page="names" aria-controls="settingsNames" aria-pressed="true">名字与档案</button>
+        <button type="button" data-settings-page="viewing" aria-controls="settingsViewing" aria-pressed="false">观影准备</button>
+        <button type="button" data-settings-page="subtitles" aria-controls="settingsSubtitles" aria-pressed="false">字幕</button>
+        <button type="button" data-settings-page="quick-messages" aria-controls="settingsQuickMessages" aria-pressed="false">快捷消息</button>
+        <button type="button" data-settings-page="connect" aria-controls="settingsConnect" aria-pressed="false">连接 AI</button>
+        <button type="button" data-settings-page="guide" aria-controls="settingsGuide" aria-pressed="false">观影指南</button>
+      </nav>
+      <section id="settingsNames" class="cinema-settings-page" aria-label="名字与档案">
+        <form id="viewerNameForm" class="settings-section settings-card">
+          <h3><label for="senderNameInput">我的名字</label></h3>
+          <div class="settings-input-row">
+            <input id="senderNameInput" type="text" maxlength="60" autocomplete="nickname" placeholder="user" aria-describedby="viewerNameHelp">
+            <button type="submit" class="room-button settings-primary-button" id="viewerNameSave" disabled>保存名字</button>
+          </div>
+          <p id="viewerNameHelp">聊天、弹幕和手记都会显示这个名字。留空时显示 user。</p>
+          <p id="viewerNameStatus" class="settings-feedback" role="status"></p>
+        </form>
+        <section class="settings-section settings-card" aria-labelledby="aiProfileHeading">
+          <h3 id="aiProfileHeading"><label for="aiProfileSelect">AI 观众档案</label></h3>
+          <div class="settings-input-row">
+            <select id="aiProfileSelect" aria-describedby="aiProfileHelp" disabled><option>正在读取档案…</option></select>
+            <button id="aiProfileRename" type="button" class="room-button" disabled>改名</button>
+          </div>
+          <p id="aiProfileHelp">选中的档案会给下一个新连接使用。已连接的 AI 继续使用各自的档案。</p>
+          <form id="aiProfileEditor" class="profile-editor" hidden>
+            <label for="aiProfileName" id="aiProfileNameLabel">新 AI 的名字</label>
+            <input id="aiProfileName" type="text" maxlength="60" autocomplete="off" required>
+            <div class="settings-actions">
+              <button type="button" id="aiProfileCancel" class="room-button">取消</button>
+              <button type="submit" id="aiProfileCommit" class="room-button settings-primary-button">添加并选用</button>
+            </div>
+          </form>
+          <p id="aiProfileStatus" class="settings-feedback" role="status"></p>
+          <button type="button" id="aiProfileReload" class="room-button" hidden>重新读取档案</button>
+        </section>
+      </section>
+      <section id="settingsViewing" class="cinema-settings-page" aria-label="观影准备" hidden>
+        <form class="viewing-settings-form" id="viewingSettingsForm">
+          <fieldset class="viewing-settings-fields" id="viewingSettingsFields" aria-label="观影设置选项" disabled>
+            <div class="settings-card settings-group">
+              <h3 class="settings-group-title">AI 跟片节奏</h3>
+              <div class="settings-grid-2">
+                <label class="viewing-cadence-label" for="viewingIntervalInput">
+                  <span>AI 查看间隔</span>
+                  <span class="viewing-cadence-field">
+                    <input id="viewingIntervalInput" name="intervalSeconds" type="number" min="0.5" max="30" step="any" inputmode="decimal" value="2" required>
+                    <span>秒</span>
+                  </span>
+                  <small>默认 2 秒，可设为 0.5 至 30 秒。间隔越短，AI 获取新内容越及时，请求也越多。</small>
+                </label>
+                <label class="viewing-cadence-label" for="aiOnlineTimeoutInput">
+                  <span>AI 在线保留时间</span>
+                  <span class="viewing-cadence-field">
+                    <input id="aiOnlineTimeoutInput" name="aiOnlineTimeoutSeconds" type="number" min="1" max="300" step="1" inputmode="numeric" value="30" required>
+                    <span>秒</span>
+                  </span>
+                  <small>从 AI 最近一次成功跟片起计。默认 30 秒，可设为 1 至 300 秒。影片暂停时，AI 继续跟片就会保持在线。</small>
+                </label>
+              </div>
+            </div>
+            <div class="settings-card settings-group">
+              <h3 class="settings-group-title">影片准备与提醒</h3>
+              <label class="viewing-cadence-label" for="initialBufferSelect">
+                <span>起步缓冲</span>
+                <select id="initialBufferSelect" name="initialBufferMinutes" required>
+                  <option value="">选择准备时长</option>
+                  <option value="15">15 分钟 · 起步等待较短</option>
+                  <option value="30">30 分钟 · 缓冲更充足</option>
+                </select>
+                <small>影片准备到所选时长后即可开看，余下内容在后台继续准备。短片准备到片尾即可。</small>
+              </label>
+              <div class="settings-check-card">
+                <label class="viewing-cadence-label settings-check-label" for="includeAudioInput">
+                  <span><input id="includeAudioInput" name="includeAudio" type="checkbox" checked> 准备声音描述</span>
+                  <small>需要本地声音模型。勾选后，下次准备影片时会同时生成环境声与音乐的描述。</small>
+                </label>
+                <p id="audioEnvironmentStatus" role="status" aria-live="polite">尚未检查声音环境。</p>
+              </div>
+              <div class="settings-check-card">
+                <label class="viewing-cadence-label settings-check-label" for="skipIntroOutroPromptInput">
+                  <span><input id="skipIntroOutroPromptInput" name="skipIntroOutroPrompt" type="checkbox"> 跳过片头片尾</span>
+                  <small>开启后，准备尚未填写跳过区间的影片前会先提醒。关闭时不提醒，影片和文件夹已填写的区间仍会生效。</small>
+                </label>
+              </div>
+            </div>
+          </fieldset>
+          <div class="settings-form-footer">
+            <p class="viewing-settings-status" id="viewingSettingsStatus" role="status" aria-live="polite">正在读取观影设置…</p>
+            <div class="ai-subtitle-actions">
+              <button class="room-button" id="viewingSettingsRetry" type="button" hidden>重新读取</button>
+              <button class="room-button settings-primary-button ai-subtitle-confirm" id="viewingSettingsSave" type="submit" disabled>保存设置</button>
+            </div>
+          </div>
+        </form>
+      </section>
+      <section id="settingsSubtitles" class="cinema-settings-page" aria-label="字幕" hidden>
+        <form class="settings-section settings-card" id="subtitlePreferencesForm">
+          <fieldset class="subtitle-settings-tracks subtitle-language-grid" id="subtitlePreferenceFields" disabled>
+            <legend>新入库影片自动提取的内嵌字幕</legend>
+            <div class="subtitle-language-options">
+              <label class="subtitle-lang-pill"><input type="checkbox" value="zh-Hans" checked> <span>简体中文</span></label>
+              <label class="subtitle-lang-pill"><input type="checkbox" value="zh-Hant" checked> <span>繁体中文</span></label>
+              <label class="subtitle-lang-pill"><input type="checkbox" value="en" checked> <span>英文</span></label>
+            </div>
+          </fieldset>
+          <p>设置适用于整个影院的新入库影片。三项可任意勾选，也可全部留空。简体和繁体都勾选时，才会自动提取未注明简繁的中文轨。已入库影片可在「影片设置」补提。</p>
+          <div class="settings-form-footer">
+            <p id="subtitlePreferencesStatus" class="settings-feedback" role="status"></p>
+            <div class="settings-actions">
+              <button id="subtitlePreferencesRetry" class="room-button" type="button" hidden>重新读取</button>
+              <button id="subtitlePreferencesSave" class="room-button settings-primary-button" type="submit" disabled>保存字幕偏好</button>
+            </div>
+          </div>
+        </form>
+      </section>
+      <section id="settingsQuickMessages" class="cinema-settings-page" aria-label="快捷消息" hidden>
+        <section class="settings-section settings-card" aria-labelledby="quickMessagesListHeading">
+          <h3 id="quickMessagesListHeading">已保存的快捷消息</h3>
+          <p>在房间输入框旁点击「＋」即可快速填入以下内容；如果输入框里已有文字，会接在后面一起发送。</p>
+          <div id="quickMessageList" class="quick-message-list"></div>
+          <p id="quickMessageStatus" class="settings-feedback" role="status"></p>
+          <div class="settings-actions">
+            <button type="button" id="quickMessageReload" class="room-button" hidden>重新读取快捷消息</button>
+          </div>
+        </section>
+        <form id="quickMessageAddForm" class="settings-section settings-card">
+          <h3>添加快捷消息</h3>
+          <label class="viewing-cadence-label" for="quickMessageNewTitle">
+            <span>标题</span>
+            <input id="quickMessageNewTitle" type="text" maxlength="40" autocomplete="off" placeholder="例如：整理观影手记、暂停聊一下" required>
+          </label>
+          <label class="viewing-cadence-label" for="quickMessageNewContent">
+            <span>消息内容</span>
+            <textarea id="quickMessageNewContent" rows="3" maxlength="800" placeholder="写下点击后自动填入输入框的话…" required></textarea>
+          </label>
+          <div class="settings-actions quick-message-add-actions">
+            <button type="submit" id="quickMessageAddSubmit" class="room-button settings-primary-button">添加快捷消息</button>
+          </div>
+        </form>
+      </section>
+      <section id="settingsConnect" class="cinema-settings-page" aria-label="连接 AI" hidden>
+        <div class="connect-client-tabs connect-mode-tabs" role="group" aria-label="AI 连接方式">
+          <button type="button" class="room-button" data-connect-mode="mcp" aria-controls="connectMcpPanel" aria-pressed="true">MCP 客户端</button>
+          <button type="button" class="room-button" data-connect-mode="bridge" aria-controls="connectBridgePanel" aria-pressed="false">自动观影</button>
+        </div>
+        <section id="connectBridgePanel" class="settings-section connect-panel-stack" aria-labelledby="watchBridgeHeading" hidden>
+          <div class="settings-card">
+            <label class="viewing-cadence-label" for="watchBridgeMode">
+              <span id="watchBridgeHeading">自动连接方式</span>
+              <select id="watchBridgeMode" aria-describedby="watchBridgeModeHelp" disabled>
+                <option value="codex">Codex App Server</option>
+                <option value="chat" id="watchBridgeChatOption" hidden>ChatGPT Listener</option>
+              </select>
+              <small id="watchBridgeModeHelp">切换后，影院会关闭原连接方式，保留其设置。开启新方式需打开对应的观影开关并保存。</small>
+              <span id="watchBridgeModeFeedback" class="settings-feedback" role="status"></span>
+            </label>
+            <form id="watchBridgeSettingsForm" class="settings-bridge-interval-form">
+              <label class="viewing-cadence-label" for="watchBridgeInterval">
+                <span>连续观影间隔</span>
+                <span class="viewing-cadence-field">
+                  <input id="watchBridgeInterval" name="intervalSeconds" type="number" min="0.5" max="30" step="any" inputmode="decimal" value="6" required disabled>
+                  <span>影片秒</span>
+                </span>
+                <small>默认每播放 6 秒取一次新观影内容。保存后，当前会话的下一次跟片即使用新间隔。</small>
+              </label>
+              <div class="settings-actions">
+                <button id="watchBridgeSave" class="room-button settings-primary-button" type="submit" disabled>保存连续观影间隔</button>
+                <button id="watchBridgeReload" class="room-button" type="button" hidden>重新读取</button>
+                <span id="watchBridgeFeedback" class="settings-feedback" role="status"></span>
+              </div>
+            </form>
+          </div>
+          <section id="codexScreeningPanel" class="settings-section settings-card" aria-labelledby="codexScreeningHeading">
+            <h4 id="codexScreeningHeading">Codex 连接设置</h4>
+            <form id="codexScreeningForm">
+              <fieldset class="viewing-settings-fields" id="codexScreeningFields" disabled>
+                <div class="settings-check-card codex-mode-card">
+                  <label class="codex-mode-toggle" for="codexScreeningEnabled">
+                    <span>Codex 观影模式</span>
+                    <input id="codexScreeningEnabled" type="checkbox" role="switch" aria-describedby="codexModeHelp">
+                  </label>
+                  <p id="codexModeHelp">开启并保存后，开房时可以填写本场开场白，影院会自动连接 Codex。</p>
+                </div>
+                <div class="codex-account-group">
+                  <label class="viewing-cadence-label" for="codexScreeningAuth">
+                    <span>ChatGPT 账号</span>
+                    <select id="codexScreeningAuth">
+                      <option value="inherit">沿用本机 Codex 登录</option>
+                      <option value="isolated">使用影院独立登录</option>
+                    </select>
+                  </label>
+                  <div class="settings-actions codex-account-actions">
+                    <button id="codexAccountCheck" class="room-button" type="button">读取账号与模型</button>
+                    <button id="codexAccountLogin" class="room-button" type="button" hidden>登录 ChatGPT</button>
+                    <button id="codexAccountCancel" class="room-button" type="button" hidden>取消登录</button>
+                    <a id="codexAccountLink" target="_blank" rel="noopener noreferrer" hidden>打开 ChatGPT 登录页</a>
+                  </div>
+                  <p id="codexAccountStatus" class="settings-feedback" role="status"></p>
+                </div>
+                <label class="viewing-cadence-label" for="codexScreeningModel">
+                  <span>观影模型</span>
+                  <select id="codexScreeningModel"><option value="">Codex 默认模型</option></select>
+                  <small>点「读取账号与模型」载入支持画面的模型。更换账号或模型从下一场生效。</small>
+                </label>
+                <section class="viewing-settings-fields codex-prompt-subcard" aria-labelledby="codexPromptHeading">
+                  <h5 id="codexPromptHeading">观影项目提示词</h5>
+                  <label class="viewing-cadence-label" for="codexScreeningInstructions">
+                    <span>项目指令（AGENTS.md）</span>
+                    <textarea id="codexScreeningInstructions" rows="7" maxlength="12000" aria-describedby="codexPromptHelp"></textarea>
+                    <small id="codexPromptHelp">保存后从下一场生效。<code>{{viewerName}}</code> 会替换为「名字与档案」里的观众昵称。</small>
+                  </label>
+                  <div class="settings-actions">
+                    <button id="codexScreeningRestore" class="room-button" type="button">恢复默认项目指令</button>
+                  </div>
+                </section>
+                <div class="settings-form-footer">
+                  <p id="codexScreeningStatus" class="settings-feedback" role="status"></p>
+                  <div class="settings-actions">
+                    <button id="codexScreeningSave" class="room-button settings-primary-button" type="submit">保存 Codex 设置</button>
+                  </div>
+                </div>
+              </fieldset>
+            </form>
+            <details class="settings-details">
+              <summary>本机安装与配置</summary>
+              <div class="settings-details-body">
+                <p id="codexInstallationStatus"></p>
+                <div id="codexInstallationConfig" hidden>
+                  <textarea id="codexDerivedConfig" class="connect-code-box" rows="7" readonly spellcheck="false" aria-label="Codex 本机有效配置"></textarea>
+                  <button id="codexCopyConfig" class="room-button" type="button">复制本机配置</button>
+                </div>
+                <p>安装或更新 Codex 后，在上方读取账号和支持画面的模型。影院独立登录使用影院的数据目录。</p>
+                <div class="settings-actions settings-command-row">
+                  <code id="codexInstallCommand">npm install -g @openai/codex@latest</code>
+                  <button id="codexInstallCopy" class="room-button" type="button">复制命令</button>
+                </div>
+                <p id="codexInstallCopyStatus" class="settings-feedback" role="status"></p>
+              </div>
+            </details>
+          </section>
+          <section id="chatScreeningPanel" class="settings-section settings-card" aria-labelledby="chatScreeningHeading" hidden>
+            <h4 id="chatScreeningHeading">ChatGPT Listener 设置</h4>
+            <form id="chatScreeningForm">
+              <fieldset class="viewing-settings-fields" id="chatScreeningFields" disabled>
+                <div class="settings-check-card codex-mode-card">
+                  <label class="codex-mode-toggle" for="chatScreeningEnabled">
+                    <span>ChatGPT 自动观影</span>
+                    <input id="chatScreeningEnabled" type="checkbox" role="switch" aria-describedby="chatModeHelp">
+                  </label>
+                  <p id="chatModeHelp">在要一起看的 ChatGPT 对话中打开 Open Watch Cinema 卡片，再点卡片上的「开始观影」。两个开关都打开后，影院会随播放进度自动送来观影资料。开启此开关会将影院的自动连接方式切换为 ChatGPT Listener。</p>
+                  <p id="chatScreeningConnection" class="settings-feedback" role="status"></p>
+                </div>
+                <div class="viewing-settings-fields">
+                  <label class="viewing-cadence-label" for="chatLookaheadMode">
+                    <span>提前观影时长</span>
+                    <select id="chatLookaheadMode" aria-describedby="chatLookaheadHelp">
+                      <option value="off">关闭</option>
+                      <option value="custom">自定义</option>
+                    </select>
+                    <small id="chatLookaheadHelp">播放中，AI 可以看到比影院当前进度提前指定秒数的画面和对白。</small>
+                  </label>
+                  <label class="viewing-cadence-label" for="chatLookaheadSeconds" id="chatLookaheadCustomField" hidden>
+                    <span>自定义时长</span>
+                    <span class="viewing-cadence-field">
+                      <input id="chatLookaheadSeconds" type="number" min="0.5" max="30" step="0.001" inputmode="decimal" required disabled>
+                      <span>影片秒</span>
+                    </span>
+                  </label>
+                </div>
+                <label class="viewing-cadence-label" for="chatScreeningInstructions">
+                  <span>观影提示词</span>
+                  <textarea class="connect-prompt-box" id="chatScreeningInstructions" rows="7" maxlength="12000" aria-describedby="chatPromptHelp"></textarea>
+                  <small id="chatPromptHelp">随本场首次自动交付发送一次。<code>{{viewerName}}</code> 会替换为「名字与档案」里的观众昵称。</small>
+                </label>
+                <div class="settings-actions">
+                  <button id="chatScreeningRestore" class="room-button" type="button">载入出厂提示词</button>
+                </div>
+                <div class="settings-form-footer">
+                  <p id="chatScreeningStatus" class="settings-feedback" role="status"></p>
+                  <div class="settings-actions">
+                    <button class="room-button settings-primary-button" type="submit">保存 ChatGPT 设置</button>
+                  </div>
+                </div>
+              </fieldset>
+            </form>
+            <details id="chatToolSettings" class="settings-details">
+              <summary>ChatGPT 工具范围</summary>
+              <form id="chatToolSettingsForm" class="settings-details-body">
+                <fieldset class="subtitle-settings-tracks connect-tool-options" id="chatToolSettingsFields" aria-describedby="chatToolsHelp" disabled>
+                  <p><strong>观影（基础工具）</strong> · 通过卡片跟片、在房间发言与互动、读写共用手记、重看已收到的分镜。</p>
+                  <label for="chatEnableManual"><input type="checkbox" id="chatEnableManual"> <span><strong>主动观影（无需卡片）</strong> · 让 ChatGPT 主动读取已播放的观影资料，无需开启自动观影。</span></label>
+                  <label for="chatEnableHistory"><input type="checkbox" id="chatEnableHistory"> <span><strong>历史</strong> · 回查已播放的旧台词与声音。</span></label>
+                  <label for="chatEnableControl"><input type="checkbox" id="chatEnableControl"> <span><strong>控制</strong> · 管理片库、准备观影包、开关房间与提出跳转建议。仅在当前对话的卡片已开始跟片时可用。卡片启动后，即使尚未开房，也可以管理片库或准备观影包。</span></label>
+                  <p id="chatToolsHelp">保存后，在 ChatGPT 的应用设置里对同一个 Open Watch Cinema 插件点 Refresh，以更新工具列表。</p>
+                </fieldset>
+                <div class="settings-form-footer">
+                  <p id="chatToolSettingsStatus" class="settings-feedback" role="status"></p>
+                  <div class="settings-actions">
+                    <button id="chatToolSettingsSave" class="room-button settings-primary-button" type="submit" disabled>保存工具范围</button>
+                  </div>
+                </div>
+              </form>
+            </details>
+            <details class="settings-details" id="chatConnectionDetails" hidden>
+              <summary>本机连接入口</summary>
+              <div class="settings-details-body">
+                <p>为这个独立应用配置自己的 Secure MCP Tunnel。启动命令在项目根目录运行。</p>
+                <div class="settings-actions settings-command-row">
+                  <code>node watch-bridge/adapters/chat/main.mjs</code>
+                </div>
+                <p>应用接好后，在 ChatGPT 中打开 Open Watch Cinema。安装和首测步骤见项目内的 <code>docs/工具准备/ChatGPT 工具配置.md</code>。</p>
+              </div>
+            </details>
+          </section>
+        </section>
+        <section id="connectMcpPanel" class="settings-section connect-mcp connect-panel-stack" aria-label="MCP 客户端连接">
+          <section class="settings-section settings-card" aria-labelledby="connectToolsHeading">
+            <h4 id="connectToolsHeading">给 AI 的工具范围</h4>
+            <p class="connect-help">默认只提供观影和互动所需的基础工具（跟片、房间发言与互动、共享小本本、重看分镜图）。以下扩展按需勾选，修改后需重新复制配置并重启 AI 客户端。</p>
+            <fieldset class="subtitle-settings-tracks connect-tool-options">
+              <label><input type="checkbox" id="connectEnableHistory"> <span>允许回查已播放的旧台词与声音（<code>--with-history</code>）</span></label>
+              <label><input type="checkbox" id="connectEnableControl"> <span>允许 AI 控制影院：片库管理、准备观影包、开关房间与跳转建议（<code>--with-control</code>）</span></label>
+            </fieldset>
+          </section>
+          <section class="settings-section settings-card" aria-labelledby="connectClientHeading">
+            <h4 id="connectClientHeading">客户端 MCP 配置</h4>
+            <div class="connect-client-tabs" role="group" aria-label="选择 AI 客户端">
+              <button type="button" class="room-button" data-connect-client="codex" aria-pressed="true">Codex</button>
+              <button type="button" class="room-button" data-connect-client="claude-desktop" aria-pressed="false">Claude Desktop</button>
+              <button type="button" class="room-button" data-connect-client="claude-code" aria-pressed="false">Claude Code</button>
+              <button type="button" class="room-button" data-connect-client="antigravity" aria-pressed="false">Antigravity</button>
+              <button type="button" class="room-button" data-connect-client="generic" aria-pressed="false">通用 MCP</button>
+            </div>
+            <p id="connectInfoStatus" class="settings-feedback" role="status"></p>
+            <p id="connectConfigHint" class="connect-help"></p>
+            <textarea id="connectConfigOutput" class="connect-code-box" rows="6" readonly spellcheck="false" aria-label="MCP 客户端配置"></textarea>
+            <div class="settings-actions">
+              <button type="button" id="connectCopyConfig" class="room-button">复制配置</button>
+              <span id="connectCopyConfigStatus" class="settings-feedback" role="status" aria-live="polite"></span>
+            </div>
+            <p class="connect-help">以上配置适用于支持本机 stdio MCP 的客户端。更多接入说明见 <a href="#guide" id="connectOpenGuide">观影指南</a> 与项目内的 <code>docs/工具准备/MCP 客户端接入.md</code>。</p>
+          </section>
+          <section class="settings-section settings-card" aria-labelledby="connectPromptHeading">
+            <h4 id="connectPromptHeading">观影前基础 Prompt 模板</h4>
+            <p class="connect-help">这份模板保持中立，只说明影院提供的工具和当前检查间隔，不设定固定风格。复制前后，可以先和 AI 沟通你喜欢的观影偏好与交流方式，来个性化观影体验。</p>
+            <textarea id="connectPromptInput" class="connect-prompt-box" rows="10" aria-label="观影前基础 Prompt 模板"></textarea>
+            <div class="settings-actions">
+              <button type="button" id="connectCopyPrompt" class="room-button">复制 Prompt</button>
+              <button type="button" id="connectResetPrompt" class="room-button" hidden>恢复默认模板</button>
+              <span id="connectCopyPromptStatus" class="settings-feedback" role="status" aria-live="polite"></span>
+            </div>
+          </section>
+          <form id="mcpResumePromptForm" class="settings-section settings-card" aria-labelledby="mcpResumePromptHeading">
+            <h4 id="mcpResumePromptHeading">MCP 续看提示词</h4>
+            <p class="connect-help" id="mcpResumePromptHelp">手动续看开房后会显示这段提示词。影院会填入 <code>{{片名}}</code>、<code>{{续看时间}}</code> 和 <code>{{检查间隔秒数}}</code>。</p>
+            <textarea id="mcpResumePromptTemplate" class="connect-prompt-box" rows="8" maxlength="12000" aria-labelledby="mcpResumePromptHeading" aria-describedby="mcpResumePromptHelp" required disabled></textarea>
+            <div class="settings-actions">
+              <button id="mcpResumePromptSave" class="room-button settings-primary-button" type="submit" disabled>保存为本机默认</button>
+              <button id="mcpResumePromptRestore" class="room-button" type="button" disabled>载入出厂模板</button>
+              <button id="mcpResumePromptRetry" class="room-button" type="button" hidden>重新读取</button>
+              <span id="mcpResumePromptFeedback" class="settings-feedback" role="status"></span>
+            </div>
+          </form>
+        </section>
+      </section>
+      <section id="settingsGuide" class="cinema-settings-page" aria-label="观影指南" hidden>
+        <article id="viewingGuideContent" class="settings-card"></article>
+        <p id="viewingGuideStatus" role="status"></p>
+        <button type="button" id="viewingGuideRetry" class="room-button" hidden>重新读取指南</button>
+      </section>
+    </dialog>
+
+    <dialog class="ai-subtitle-dialog film-settings-dialog" id="filmSettingsDialog" aria-labelledby="filmSettingsTitle">
+      <header class="cinema-settings-header">
+        <h2 id="filmSettingsTitle">影片设置</h2>
+        <button id="filmSettingsClose" type="button" aria-label="关闭影片设置"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M3.75 3.75 12.25 12.25M12.25 3.75 3.75 12.25"/></svg></button>
+      </header>
+      <div class="cinema-settings-page" id="filmSubtitleContents">
+        <form class="skip-settings-form settings-card" id="filmSkipSettingsForm"></form>
+        <fieldset class="subtitle-settings-tracks settings-card">
+          <legend>内嵌字幕</legend>
+          <p id="filmSubtitleProbeStatus" class="settings-feedback" role="status"></p>
+          <div id="embeddedSubtitleTracks"></div>
+        </fieldset>
+        <fieldset class="subtitle-settings-tracks settings-card">
+          <legend>外挂字幕</legend>
+          <div id="externalSubtitleTracks"></div>
+        </fieldset>
+      </div>
+      <div class="film-subtitle-footer">
+        <p id="filmSubtitleStatus" class="settings-feedback" role="status"></p>
+        <p id="filmSubtitleProgress" class="settings-feedback" role="status"></p>
+        <progress id="filmSubtitleMeter" value="0" max="100" aria-label="内嵌字幕提取进度" hidden></progress>
+        <div class="settings-actions">
+          <button id="filmSubtitleReload" type="button" class="room-button" hidden>重新读取清单</button>
+          <button id="filmSubtitleRetry" type="button" class="room-button" hidden>重试提取</button>
+          <button id="filmSubtitleDelete" type="button" class="room-button danger" disabled>删除所选字幕文件</button>
+          <button id="filmSubtitleExtract" type="button" class="room-button settings-primary-button" disabled>补提所选内嵌字幕</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="ai-subtitle-dialog film-settings-dialog" id="collectionSkipSettingsDialog" aria-labelledby="collectionSkipSettingsTitle">
+      <header class="cinema-settings-header">
+        <h2 id="collectionSkipSettingsTitle">默认跳过片头片尾</h2>
+        <button id="collectionSkipSettingsClose" type="button" aria-label="关闭合集跳过设置"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M3.75 3.75 12.25 12.25M12.25 3.75 3.75 12.25"/></svg></button>
+      </header>
+      <div class="cinema-settings-page">
+        <form class="skip-settings-form settings-card" id="collectionSkipSettingsForm"></form>
+      </div>
+    </dialog>
+
+    <template id="skipSettingsFieldsTemplate">
+      <label class="skip-inherit-toggle" data-skip-inherit hidden><input type="checkbox"> <span>使用文件夹默认</span></label>
+      <p class="settings-feedback" data-skip-source></p>
+      <fieldset class="subtitle-settings-tracks skip-settings-fields" data-skip-fields disabled>
+        <legend>跳过片段</legend>
+        <p class="ai-subtitle-help">时间可用分:秒或时:分:秒，例如 01:30。</p>
+        <div class="skip-range-pair">
+          <div class="skip-range-group">
+            <span>片头跳过</span>
+            <div class="skip-range-row" data-skip-intro>
+              <input type="text" data-from aria-label="片头开始时间" placeholder="00:00" autocomplete="off">
+              <span aria-hidden="true">–</span>
+              <input type="text" data-to aria-label="片头结束时间" placeholder="01:30" autocomplete="off">
+            </div>
+          </div>
+          <div class="skip-range-group">
+            <span>片尾跳过</span>
+            <div class="skip-range-row" data-skip-outro>
+              <input type="text" data-from aria-label="片尾开始时间" placeholder="开始时间" autocomplete="off">
+              <span aria-hidden="true">–</span>
+              <input type="text" data-to aria-label="片尾结束时间（留空表示到片尾）" placeholder="留空到片尾" autocomplete="off">
+            </div>
+          </div>
+        </div>
+        <div class="skip-range-group">
+          <div class="skip-range-heading">
+            <span>中间跳过时段</span>
+            <button class="room-button skip-range-icon" type="button" data-skip-add aria-label="新增中间跳过时段">+</button>
+          </div>
+          <div class="skip-range-list" data-skip-middle></div>
+        </div>
+      </fieldset>
+      <div class="settings-actions skip-settings-actions">
+        <button class="room-button settings-primary-button" type="submit" disabled>保存跳过设置</button>
+        <p class="settings-feedback" data-skip-status role="status"></p>
+      </div>
+    </template>
+    <template id="skipMiddleRowTemplate">
+      <div class="skip-range-row">
+        <input type="text" data-from aria-label="中间时段开始时间" placeholder="开始时间" autocomplete="off">
+        <span aria-hidden="true">–</span>
+        <input type="text" data-to aria-label="中间时段结束时间" placeholder="结束时间" autocomplete="off">
+        <button class="room-button skip-range-icon" type="button" aria-label="删除这个中间跳过时段">×</button>
+      </div>
+    </template>
+
+    <dialog class="ai-subtitle-dialog" id="filmSubtitleDeleteDialog" aria-labelledby="filmSubtitleDeleteTitle" aria-describedby="filmSubtitleDeleteText">
+      <form method="dialog" class="ai-subtitle-form">
+        <h2 id="filmSubtitleDeleteTitle">删除字幕文件</h2>
+        <p id="filmSubtitleDeleteText" class="ai-subtitle-help"></p>
+        <div class="ai-subtitle-actions">
+          <button type="submit" class="room-button" value="cancel" autofocus>取消</button>
+          <button type="submit" class="room-button" value="confirm">确认删除</button>
+        </div>
+      </form>
+    </dialog>
+
+    <button id="notebookButton" type="button" aria-label="翻开观影手记" aria-expanded="false" aria-controls="notebookDialog" title="翻开观影手记 · 拖动可移动" hidden>
+      <svg viewBox="0 0 64 72" width="50" height="56" aria-hidden="true"><defs>
+        <linearGradient id="nb-cloth" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+          <stop offset="0%" stop-color="#F8FBFF"/>
+          <stop offset="26%" stop-color="#B4C7D8"/>
+          <stop offset="52%" stop-color="#EDF5FB"/>
+          <stop offset="76%" stop-color="#8EACC5"/>
+          <stop offset="100%" stop-color="#456B8D"/>
+        </linearGradient>
+      </defs><g transform="rotate(-7 32 36)">
+        <path d="M12 9 Q12 6 17 6 L51 6 Q55 6 55 10 L55 61 Q55 65 50 65 L17 65 Q10 65 10 59 L10 13Z" fill="#5c7d99" stroke="#304b64" stroke-width="2"/>
+        <path d="M13 56 Q13 59 17 59 H53 V63 H17 Q12 63 13 56Z" fill="#edf4fa"/>
+        <path d="M40 58 H48 V70 L44 66 L40 69Z" fill="#5396A8"/>
+        <g class="nb-binding"><rect x="10" y="5" width="44" height="55" rx="4" fill="url(#nb-cloth)" stroke="#456b8d" stroke-width="1.5"/>
+        <path d="M17 7V58 M20 11H49V54H20" fill="none" stroke="#2c4b68" stroke-width=".9" opacity=".78"/>
+        <path d="M39 19a10 10 0 1 0 5 14A10 10 0 0 1 39 19Z" fill="#233f5a"/>
+        <path d="m43 18 1 2 2 1-2 1-1 2-1-2-2-1 2-1z M28 42h14m-10 3h6" fill="#233f5a" stroke="#233f5a" stroke-width="1"/></g>
+      </g></svg><span class="nb-dot" hidden></span>
+    </button>
+
+    <section id="notebookDialog" role="dialog" aria-modal="false" aria-labelledby="notebookTitle" lang="zh-CN" hidden>
+      <header class="nb-header">
+        <div id="notebookGrip" tabindex="0" role="group" aria-label="移动手记。方向键移动，按住 Shift 调整大小">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15.8 3.6a8.2 8.2 0 1 0 4.6 11.4 6.5 6.5 0 0 1-4.6-11.4Z"/>
+            <path d="M16.4 10.2c-.8-1.4-2.8-1.3-3.4.2-.6 1.5.7 3.1 2.4 3.1 1.8 0 3.1-1.6 2.5-3.4"/>
+            <path d="M14.7 13.5c-.6 1.8-1.4 3.4-2.5 4.8"/>
+            <path d="M13.5 16c1.2-.2 2.2.2 2.9.9-1.1.5-2.1.4-2.9-.9Z"/>
+          </svg>
+          <h2 id="notebookTitle">观影手记</h2><span id="notebookFilm"></span>
+        </div>
+        <button type="button" id="notebookExportButton" aria-haspopup="dialog" aria-label="导出这部片的手记" title="导出这部片的手记">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3v11m0 0-4-4m4 4 4-4"/>
+            <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
+          </svg>
+          <span>导出手记</span>
+        </button>
+        <button type="button" id="notebookClose" aria-label="合上手记" title="合上手记">
+          <span>合上</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m7 7 10 10M17 9v8H9"/>
+          </svg>
+        </button>
+      </header>
+      <div class="nb-paper">
+        <div class="nb-toolbar">
+          <nav class="nb-tabs" aria-label="手记书页">
+            <button type="button" data-notebook-tab="people">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="9" cy="8.5" r="3"/>
+                <path d="M3.5 19a5.5 5.5 0 0 1 11 0"/>
+                <circle cx="16.8" cy="9.8" r="2.3"/>
+                <path d="M15.8 18.8h4.7a4 4 0 0 0-3.7-4.8"/>
+              </svg>
+              <span>人物关系</span>
+            </button>
+            <button type="button" data-notebook-tab="timeline">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6.5 4v16"/>
+                <circle cx="6.5" cy="7" r="2" fill="currentColor" stroke="none"/>
+                <circle cx="6.5" cy="12" r="2" fill="currentColor" stroke="none"/>
+                <circle cx="6.5" cy="17" r="2" fill="currentColor" stroke="none"/>
+                <path d="M11 7h9M11 12h7M11 17h8.5"/>
+              </svg>
+              <span>剧情时间线</span>
+            </button>
+            <button type="button" data-notebook-tab="question">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="8.5"/>
+                <path d="M9.6 9.5a2.6 2.6 0 0 1 5 .8c0 1.8-2.6 2-2.6 3.7"/>
+                <circle cx="12" cy="17.2" r=".9" fill="currentColor" stroke="none"/>
+              </svg>
+              <span>线索疑问</span>
+            </button>
+            <button type="button" data-notebook-tab="jot">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M19.5 4.5c-4.8.4-9.5 3.6-12.1 8.5l-.9 5.5 5.5-.9c4.9-2.6 8.1-7.3 8.5-12.1Z"/>
+                <path d="M7.5 16.5 14 10"/>
+              </svg>
+              <span>观影随记</span>
+            </button>
+          </nav>
+          <div class="nb-tab-actions nb-tools" id="notebookTabActions"></div>
+        </div>
+        <div class="nb-pages" id="notebookPages"></div>
+        <div id="notebookStatus" role="status" aria-live="polite" hidden></div>
+      </div>
+    </section>
+
+    <dialog class="ai-subtitle-dialog" id="roomOpeningDialog" aria-labelledby="roomOpeningTitle">
+      <form method="dialog" class="ai-subtitle-form room-opening-form">
+        <h2 id="roomOpeningTitle">开启房间</h2>
+        <label for="roomOpeningMessage">本场开场白（选填）</label>
+        <p class="ai-subtitle-help" id="roomOpeningHelp">影片开始播放后，这段话会随第一批观影内容发送。</p>
+        <textarea id="roomOpeningMessage" rows="5" maxlength="12000" aria-describedby="roomOpeningHelp" autofocus></textarea>
+        <p class="ai-subtitle-help" id="roomOpeningWarning" hidden></p>
+        <div class="ai-subtitle-actions">
+          <button class="room-button ai-subtitle-confirm" id="roomOpeningSubmit" type="submit" value="open">开房</button>
+          <button class="room-button" id="roomOpeningRestart" type="submit" value="restart" hidden>从头看</button>
+          <button class="room-button" type="submit" value="cancel">取消</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="ai-subtitle-dialog" id="mcpResumeDialog" aria-labelledby="mcpResumeTitle" aria-describedby="mcpResumeHelp">
+      <form method="dialog" class="ai-subtitle-form room-opening-form">
+        <h2 id="mcpResumeTitle">房间已开好</h2>
+        <p class="ai-subtitle-help" id="mcpResumeHelp">影片可以先保持暂停。你可以把提示词发给 MCP 客户端，也可以直接关闭。</p>
+        <label for="mcpResumeText">本次续看提示词</label>
+        <textarea id="mcpResumeText" rows="8"></textarea>
+        <div class="ai-subtitle-actions">
+          <button id="mcpResumeCopy" class="room-button ai-subtitle-confirm" type="button">复制提示词</button>
+          <button class="room-button" type="submit">关闭</button>
+        </div>
+        <p id="mcpResumeCopyStatus" class="settings-feedback" role="status"></p>
+      </form>
+    </dialog>
+
+    <dialog class="ai-subtitle-dialog" id="skipReminderDialog" aria-labelledby="skipReminderTitle" aria-describedby="skipReminderText">
+      <form method="dialog" class="ai-subtitle-form">
+        <h2 id="skipReminderTitle">尚未填写跳过区间</h2>
+        <p class="ai-subtitle-help" id="skipReminderText">可以先填写片头、片尾或中间时段，也可以准备整部影片。</p>
+        <div class="ai-subtitle-actions">
+          <button class="room-button ai-subtitle-confirm" type="submit" value="fill" autofocus>去填写</button>
+          <button class="room-button" type="submit" value="continue">继续整片准备</button>
         </div>
       </form>
     </dialog>
 
     <dialog class="ai-subtitle-dialog" id="aiSubtitleDialog" aria-labelledby="aiSubtitleDialogTitle">
       <form method="dialog" class="ai-subtitle-form">
-        <p class="eyebrow">AI DIALOGUE TRACK</p>
-        <h2 id="aiSubtitleDialogTitle">Choose subtitles for the AI</h2>
-        <p class="ai-subtitle-help">Choose the timed dialogue track the connected AI will read. This does not change the subtitles shown on your screen.</p>
-        <fieldset class="ai-subtitle-options" id="aiSubtitleOptions"></fieldset>
+        <p class="eyebrow">FILM PREPARATION</p>
+        <h2 id="aiSubtitleDialogTitle">准备观影包</h2>
+        <p class="ai-subtitle-help">选择本片发给 AI 的画面和已保存的对白轨。可先在「影片设置」补提内嵌字幕。屏幕字幕可在播放器中单独选择。</p>
+        <label class="viewing-cadence-label">分镜方案<select id="filmProfile"></select></label>
+        <label class="viewing-cadence-label" id="filmHeightLabel" hidden>全景高度<select id="filmHeight"><option value="480">480p</option><option value="720">720p</option><option value="1080">1080p</option></select></label>
+        <p id="filmProfileHelp" class="ai-subtitle-help"></p>
+        <p id="filmUpgradeHelp" class="ai-subtitle-help" hidden></p>
+        <fieldset aria-label="AI 对白轨" class="ai-subtitle-options" id="aiSubtitleOptions"></fieldset>
         <div class="ai-subtitle-actions">
-          <button class="room-button" id="aiSubtitleCancel" type="submit" value="cancel">Cancel</button>
-          <button class="room-button ai-subtitle-confirm" id="aiSubtitleConfirm" type="submit" value="confirm">Prepare AI package</button>
+          <button class="room-button" id="aiSubtitleCancel" type="submit" value="cancel">取消</button>
+          <button class="room-button ai-subtitle-confirm" id="aiSubtitleConfirm" type="submit" value="confirm">准备观影包</button>
         </div>
       </form>
     </dialog>
