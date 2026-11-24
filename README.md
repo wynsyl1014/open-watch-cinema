@@ -39,3 +39,7 @@ Open Watch Cinema 是一座跑在你自己电脑上的本地影院，支持 Wind
 - 想按类别浏览全部说明，去[影院文档中心](docs/README.md)（包含[观影须知](docs/README.md#观影须知)、[工具准备](docs/README.md#工具准备)和[开发须知](docs/README.md#开发须知)）。
 - 想了解项目结构、完整功能边界、MCP 协议或 Watch Bridge 细节，看[开发须知](docs/README.md#开发须知)。
 - 如果你打算自己写宿主接入 API 模型，或运行项目测试，可直接查看[API 模型接入](docs/开发须知/接入与测试.md#api-模型接入)和[测试命令](docs/开发须知/接入与测试.md#运行检查)。
+
+## 致谢
+
+感谢 [@dddd-zdf](https://github.com/dddd-zdf) 在 [#2](https://github.com/wynsyl1014/open-watch-cinema/pull/2)、[#3](https://github.com/wynsyl1014/open-watch-cinema/pull/3)、[#4](https://github.com/wynsyl1014/open-watch-cinema/pull/4) 中提出的进度跳转游标同步、分镜交付思路以及本地 CoNeTTE 声音描述方案。
