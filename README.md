@@ -6,6 +6,15 @@ Open Watch Cinema 是一座跑在你自己电脑上的本地影院，支持 Wind
 
 已经装过旧版？先看[新版变化与升级指南](docs/观影须知/新版变化与升级指南.md)，沿用原片、字幕和放映记录。
 
+![本地私人影院，和 AI 一起看电影](docs/观影须知/images/showcase/01-watch-together.jpg)
+
+| | |
+| --- | --- |
+| ![智能筛选分镜与本地声音描述](docs/观影须知/images/showcase/02-picture-and-sound.jpg) | ![共用的观影小本本](docs/观影须知/images/showcase/03-shared-notebook.jpg) |
+| ![自动跟片，也支持多位 AI 同看](docs/观影须知/images/showcase/04-ai-connections.jpg) | ![片库目录整理、跳过片段与离线导出](docs/观影须知/images/showcase/05-library-and-keepsakes.jpg) |
+
+[在线完整展示页](https://wynsyl1014.github.io/open-watch-cinema/)
+
 ## 这座影院现在能做什么
 
 - **本地片库与播片**：导入影片、按剧集建合集，先试播确认声画正常；遇到格式或编码问题可按症状修复，屏幕字幕和给 AI 读的对白轨也能分开选择。

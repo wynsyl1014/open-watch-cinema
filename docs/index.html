@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Open Watch Cinema — 本地开源私人影院</title>
+<style>
+:root{
+  color-scheme:light;
+  font-family:"PingFang SC",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:#152b40;
+  background:#edf5fb;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  background:
+    radial-gradient(ellipse 85% 55% at 18% 6%,rgba(248,251,255,.94),transparent 65%),
+    radial-gradient(ellipse 75% 65% at 88% 92%,rgba(69,107,141,.42),transparent 65%),
+    linear-gradient(155deg,#F8FBFF 0%,#EDF5FB 26%,#B4C7D8 58%,#8EACC5 82%,#456B8D 100%) fixed;
+}
+main{max-width:1200px;margin:0 auto;padding:clamp(1.6rem,4vw,3.4rem) clamp(1.2rem,3vw,2.4rem) 4rem}
+header{
+  padding-bottom:1.8rem;
+  margin-bottom:2rem;
+  border-bottom:1px solid rgba(21,43,64,.12);
+  display:flex;
+  flex-wrap:wrap;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:1.2rem;
+}
+.eyebrow{
+  margin:0 0 .5rem;
+  font-size:.78rem;
+  font-weight:600;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  color:#4e6d8a;
+}
+h1{
+  font-weight:640;
+  letter-spacing:-.035em;
+  font-size:clamp(2.1rem,5.5vw,3.6rem);
+  line-height:1.08;
+  margin:0 0 .65rem;
+  color:#152b40;
+}
+.intro{
+  margin:0;
+  color:#385672;
+  font-size:clamp(.98rem,1.8vw,1.1rem);
+  line-height:1.65;
+  max-width:44rem;
+}
+.actions{display:flex;flex-wrap:wrap;gap:.65rem}
+.btn{
+  display:inline-flex;
+  align-items:center;
+  gap:.4rem;
+  padding:.62rem 1.05rem;
+  border-radius:999px;
+  font-size:.88rem;
+  font-weight:600;
+  text-decoration:none;
+  border:1px solid rgba(69,107,141,.28);
+  background:rgba(248,251,255,.82);
+  color:#152b40;
+  backdrop-filter:blur(10px);
+  transition:transform .16s ease,background .16s ease,box-shadow .16s ease;
+}
+.btn:hover{background:#f8fbff;transform:translateY(-1px);box-shadow:0 8px 20px rgba(21,43,64,.12)}
+.btn.primary{background:#152b40;color:#f8fbff;border-color:#152b40}
+.btn.primary:hover{background:#1f3d5a}
+.hero{
+  margin-bottom:1.6rem;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:1.5rem;
+}
+.feature{
+  border:1px solid rgba(255,255,255,.82);
+  border-radius:1.1rem;
+  overflow:hidden;
+  background:rgba(248,251,255,.78);
+  backdrop-filter:blur(14px);
+  box-shadow:0 18px 42px rgba(21,43,64,.14);
+  display:flex;
+  flex-direction:column;
+}
+.preview{display:block;background:#edf5fb;overflow:hidden}
+.preview img{display:block;width:100%;height:auto;transition:transform .28s ease}
+.preview:hover img{transform:scale(1.012)}
+.caption{padding:1.05rem 1.2rem 1.2rem;display:grid;gap:.35rem}
+h2{margin:0;font-size:1.08rem;font-weight:600;color:#152b40}
+.caption p{margin:0;font-size:.9rem;line-height:1.6;color:#415f7b}
+footer{
+  margin-top:2.8rem;
+  padding-top:1.2rem;
+  border-top:1px solid rgba(248,251,255,.4);
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  gap:.8rem;
+  font-size:.84rem;
+  color:rgba(248,251,255,.9);
+}
+footer a{color:#f8fbff;text-decoration:underline;text-underline-offset:3px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <p class="eyebrow">OPEN WATCH CINEMA</p>
+      <h1>本地私人影院，和 AI 一起看电影</h1>
+      <p class="intro">支持 Windows 与 macOS。片源、字幕、观影包和手记全部保存在本机；可以一个人安静看片，也可以开房邀请 AI 一起看分镜、读对白、听懂环境声并写下共用小本本。</p>
+    </div>
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/wynsyl1014/open-watch-cinema" target="_blank" rel="noopener">GitHub 仓库</a>
+      <a class="btn" href="https://github.com/wynsyl1014/open-watch-cinema/blob/main/docs/README.md" target="_blank" rel="noopener">影院文档</a>
+      <a class="btn" href="https://github.com/wynsyl1014/open-watch-cinema/blob/main/docs/%E8%A7%82%E5%BD%B1%E9%A1%BB%E7%9F%A5/%E6%96%B0%E7%89%88%E5%8F%98%E5%8C%96%E4%B8%8E%E5%8D%87%E7%BA%A7%E6%8C%87%E5%8D%97.md" target="_blank" rel="noopener">旧版升级指南</a>
+    </div>
+  </header>
+
+  <article class="feature hero">
+    <a class="preview" href="观影须知/images/showcase/01-watch-together.jpg" target="_blank" rel="noopener">
+      <img src="观影须知/images/showcase/01-watch-together.jpg" alt="本地私人影院，和 AI 一起看电影" width="1600" height="900">
+    </a>
+    <div class="caption">
+      <h2>本地私人影院，和 AI 一起看电影</h2>
+      <p>全中文新界面与票根操作区，支持实时弹幕、递爆米花/可乐/碰杯等轻互动、双轨字幕独立选择，所有片源与记录留在本地。</p>
+    </div>
+  </article>
+
+  <section class="grid" aria-label="核心功能展示">
+    <article class="feature">
+      <a class="preview" href="观影须知/images/showcase/02-picture-and-sound.jpg" target="_blank" rel="noopener">
+        <img src="观影须知/images/showcase/02-picture-and-sound.jpg" alt="智能筛选分镜与本地声音描述" width="1600" height="900" loading="lazy">
+      </a>
+      <div class="caption">
+        <h2>智能筛选分镜与本地声音描述</h2>
+        <p>经济 / 均衡 / 完整三档 v3 观影包，自动静态去重与 8fps 动作复核、1080p 微细节画中画放大，可选本地 CoNeTTE 环境声与配乐描述。</p>
+      </div>
+    </article>
+
+    <article class="feature">
+      <a class="preview" href="观影须知/images/showcase/03-shared-notebook.jpg" target="_blank" rel="noopener">
+        <img src="观影须知/images/showcase/03-shared-notebook.jpg" alt="共用的观影小本本" width="1600" height="900" loading="lazy">
+      </a>
+      <div class="caption">
+        <h2>共用的观影小本本</h2>
+        <p>跨场次保留的共享手记，自动排布人物关系图，记录人物小传与外貌特征、剧情时间线、线索疑问与随记，人与 AI 共同编辑并各自署名。</p>
+      </div>
+    </article>
+
+    <article class="feature">
+      <a class="preview" href="观影须知/images/showcase/04-ai-connections.jpg" target="_blank" rel="noopener">
+        <img src="观影须知/images/showcase/04-ai-connections.jpg" alt="自动跟片，也支持多位 AI 同看" width="1600" height="900" loading="lazy">
+      </a>
+      <div class="caption">
+        <h2>自动跟片，也支持多位 AI 同看</h2>
+        <p>支持 ChatGPT 影院卡片、Codex App Server 自动按进度跟片，以及任意本地 stdio MCP 客户端接入；多位 AI 可同时进房并独立署名。</p>
+      </div>
+    </article>
+
+    <article class="feature">
+      <a class="preview" href="观影须知/images/showcase/05-library-and-keepsakes.jpg" target="_blank" rel="noopener">
+        <img src="观影须知/images/showcase/05-library-and-keepsakes.jpg" alt="片库目录整理、跳过片段与离线导出" width="1600" height="900" loading="lazy">
+      </a>
+      <div class="caption">
+        <h2>片库目录整理、跳过片段与离线导出</h2>
+        <p>自动归档清晰的中文目录结构，支持合集管理、按合集跳过片头片尾、断点续看，以及导出窄票根样式的离线 HTML 放映记录和手记。</p>
+      </div>
+    </article>
+  </section>
+
+  <footer>
+    <span>Open Watch Cinema · 本地开源私人影院</span>
+    <a href="https://github.com/wynsyl1014/open-watch-cinema" target="_blank" rel="noopener">wynsyl1014/open-watch-cinema</a>
+  </footer>
+</main>
+</body>
+</html>
